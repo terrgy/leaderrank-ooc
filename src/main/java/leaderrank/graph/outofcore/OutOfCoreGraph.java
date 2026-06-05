@@ -18,17 +18,18 @@ import java.util.NoSuchElementException;
 import java.util.PrimitiveIterator;
 
 public final class OutOfCoreGraph implements Graph {
-    static final int SOURCES_BUFFER_BYTES = 1024;
-    static final MemoryBudget DEFAULT_BUDGET = new MemoryBudget(256L << 20);
+    static final int SOURCES_BUFFER_BYTES = 1 << 16;
 
     private final OutOfCorePreprocessingData data;
+    private final ThreadLocal<ByteBuffer> gatherBuffer =
+            ThreadLocal.withInitial(() -> ByteBuffer.allocate(SOURCES_BUFFER_BYTES).order(ByteOrder.LITTLE_ENDIAN));
 
     private OutOfCoreGraph(OutOfCorePreprocessingData data) {
         this.data = data;
     }
 
     public static Graph build(EdgeSource source) throws IOException {
-        return build(source, DEFAULT_BUDGET);
+        return build(source, MemoryBudget.discover());
     }
 
     public static Graph build(EdgeSource source, MemoryBudget budget) throws IOException {
@@ -94,7 +95,8 @@ public final class OutOfCoreGraph implements Graph {
     }
 
     @Override
-    public SourceCursor openSourceCursor() throws IOException {
-        return new SourceFileStream(data.sourcesFile(), SOURCES_BUFFER_BYTES);
+    public SourceCursor openSourceCursor(int fromDestinationDenseId) throws IOException {
+        long startByteOffset = (long) data.sourcesPtr()[fromDestinationDenseId] * Integer.BYTES;
+        return new SourceFileStream(data.sourcesFile(), gatherBuffer.get(), startByteOffset);
     }
 }

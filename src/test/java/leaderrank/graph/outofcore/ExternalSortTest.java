@@ -70,4 +70,24 @@ class ExternalSortTest {
         Path bin = writeBin(dir, new int[] {9, 1, 5});
         assertThat(sortToList(bin, 100, dir)).containsExactly(1, 5, 9);
     }
+
+    @Test
+    void boundedFanInMatchesUnboundedMerge(@TempDir Path dir) throws IOException {
+        Random random = new Random(11);
+        int[] values = new int[5000];
+        for (int i = 0; i < values.length; i++) {
+            values[i] = random.nextInt(1_000_000);
+        }
+        Path bin = writeBin(dir, values);
+
+        List<Integer> bounded = new ArrayList<>();
+        ExternalSort.sort(bin, 8, dir, value -> bounded.add(value), 2L * (1 << 16));
+
+        int[] expected = values.clone();
+        Arrays.sort(expected);
+        assertThat(bounded).hasSize(expected.length);
+        for (int i = 0; i < expected.length; i++) {
+            assertThat(bounded.get(i)).isEqualTo(expected[i]);
+        }
+    }
 }

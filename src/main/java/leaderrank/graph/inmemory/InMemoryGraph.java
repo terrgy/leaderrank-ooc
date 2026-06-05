@@ -90,9 +90,9 @@ public final class InMemoryGraph implements Graph {
     }
 
     @Override
-    public SourceCursor openSourceCursor() {
+    public SourceCursor openSourceCursor(int fromDestinationDenseId) {
         return new SourceCursor() {
-            private int destination = 0;
+            private int destination = fromDestinationDenseId;
             private int index = 0;
 
             @Override

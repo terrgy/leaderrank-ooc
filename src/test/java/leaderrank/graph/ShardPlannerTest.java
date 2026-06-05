@@ -1,4 +1,4 @@
-package leaderrank.graph.outofcore;
+package leaderrank.graph;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

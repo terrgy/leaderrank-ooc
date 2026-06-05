@@ -72,6 +72,32 @@ class OutOfCoreSourcesTest {
     }
 
     @Test
+    void boundedBudgetSourcesAreByteIdenticalToUnbounded(@TempDir Path dir) throws IOException {
+        for (long seed = 1; seed <= 20; seed++) {
+            EdgeSource source = csv(randomCsv(seed));
+            Path bounded = dir.resolve("bounded-" + seed);
+            Path whole = dir.resolve("whole-" + seed);
+            OutOfCoreGraphPreprocessor.process(source, bounded, new MemoryBudget(1 << 20));
+            OutOfCoreGraphPreprocessor.process(source, whole, 1L << 30);
+            assertThat(Files.readAllBytes(bounded)).isEqualTo(Files.readAllBytes(whole));
+        }
+    }
+
+    @Test
+    void boundedBudgetHyperNodeIsByteIdenticalToUnbounded(@TempDir Path dir) throws IOException {
+        StringBuilder text = new StringBuilder("from,to\n");
+        for (int i = 1; i <= 500; i++) {
+            text.append(i).append(",0\n");
+        }
+        EdgeSource source = csv(text.toString());
+        Path bounded = dir.resolve("bounded");
+        Path whole = dir.resolve("whole");
+        OutOfCoreGraphPreprocessor.process(source, bounded, new MemoryBudget(1 << 20));
+        OutOfCoreGraphPreprocessor.process(source, whole, 1L << 30);
+        assertThat(Files.readAllBytes(bounded)).isEqualTo(Files.readAllBytes(whole));
+    }
+
+    @Test
     void binnedSourcesMatchInMemoryInNeighbours() throws IOException {
         EdgeSource source = csv("from,to\n1,2\n1,3\n2,3\n3,1\n3,4\n4,3\n5,3\n6,3\n");
         Graph truth = InMemoryGraph.build(source);

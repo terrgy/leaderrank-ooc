@@ -20,6 +20,7 @@ java {
 
 application {
     mainClass = "leaderrank.cli.Main"
+    applicationDefaultJvmArgs = listOf("-XX:+UseSerialGC")
 }
 
 dependencies {

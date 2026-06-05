@@ -38,22 +38,24 @@ final class OutOfCoreGraphPreprocessor {
 
     static OutOfCorePreprocessingData process(EdgeSource source, Path sourcesPath, long maxEdgesPerBin)
             throws IOException {
-        return assemble(source, pass1(source), sourcesPath, clampToInt(maxEdgesPerBin));
+        return assemble(source, pass1(source), sourcesPath, clampToInt(maxEdgesPerBin), Long.MAX_VALUE);
     }
 
     static OutOfCorePreprocessingData process(EdgeSource source, Path sourcesPath, MemoryBudget budget)
             throws IOException {
         Pass1Result pass1 = pass1(source);
-        return assemble(source, pass1, sourcesPath, budget.maxEdgesPerBin(pass1.outDegrees().length));
+        int vertexCount = pass1.outDegrees().length;
+        return assemble(source, pass1, sourcesPath,
+                budget.maxEdgesPerBin(vertexCount), budget.availableBytes(vertexCount));
     }
 
     private static OutOfCorePreprocessingData assemble(EdgeSource source, Pass1Result pass1, Path sourcesPath,
-            int maxEdgesPerBin) throws IOException {
+            int maxEdgesPerBin, long availableBytes) throws IOException {
         List<Bin> bins = BinPlanner.plan(pass1.sourcesPtr(), maxEdgesPerBin);
 
         try (BinFiles binFiles = BinFiles.create(bins)) {
-            binFiles.distribute(source, pass1.mapper());
-            writeSortedSources(binFiles, sourcesPath, maxEdgesPerBin);
+            binFiles.distribute(source, pass1.mapper(), availableBytes);
+            writeSortedSources(binFiles, sourcesPath, maxEdgesPerBin, availableBytes);
         }
 
         return new OutOfCorePreprocessingData(
@@ -69,16 +71,16 @@ final class OutOfCoreGraphPreprocessor {
         return (int) Math.max(1, Math.min(value, Integer.MAX_VALUE));
     }
 
-    private static void writeSortedSources(BinFiles binFiles, Path sourcesPath, int chunkRecords)
+    private static void writeSortedSources(BinFiles binFiles, Path sourcesPath, int chunkRecords, long availableBytes)
             throws IOException {
         List<Bin> bins = binFiles.bins();
         try (FileChannel channel = FileChannel.open(sourcesPath,
                 StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
-            ByteBuffer buffer = ByteBuffer.allocateDirect(1 << 20).order(ByteOrder.LITTLE_ENDIAN);
+            ByteBuffer buffer = ByteBuffer.allocate(1 << 20).order(ByteOrder.LITTLE_ENDIAN);
             IntSink sink = value -> putSource(channel, buffer, value);
             for (int b = 0; b < bins.size(); b++) {
                 if (bins.get(b).oversized()) {
-                    ExternalSort.sort(binFiles.pathOf(b), chunkRecords, binFiles.directory(), sink);
+                    ExternalSort.sort(binFiles.pathOf(b), chunkRecords, binFiles.directory(), sink, availableBytes);
                 } else {
                     long[] packed = binFiles.loadPacked(b);
                     Arrays.sort(packed);

@@ -1,4 +1,4 @@
-package leaderrank.graph.outofcore;
+package leaderrank.graph;
 
 import java.util.ArrayList;
 import java.util.List;

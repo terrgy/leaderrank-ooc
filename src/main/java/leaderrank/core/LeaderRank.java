@@ -78,7 +78,7 @@ public final class LeaderRank implements RankingEngine {
             next = swap;
             ground = nextGround;
 
-            if (delta < tolerance) {
+            if (delta < tolerance * n) {
                 converged = true;
                 break;
             }

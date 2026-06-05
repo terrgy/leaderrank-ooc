@@ -1,5 +1,7 @@
 package leaderrank.graph.outofcore;
 
+import leaderrank.graph.Shard;
+import leaderrank.graph.ShardPlanner;
 import leaderrank.graph.edge.EdgeSource;
 
 import java.io.IOException;

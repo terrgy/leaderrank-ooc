@@ -10,17 +10,17 @@ import java.util.stream.IntStream;
 import leaderrank.core.DenseLeaderRank;
 import leaderrank.core.LeaderRank;
 import leaderrank.core.LeaderRankResult;
+import leaderrank.core.ParallelLeaderRank;
 import leaderrank.core.RankingEngine;
 import leaderrank.gen.RmatGenerator;
 import leaderrank.graph.Graph;
+import leaderrank.graph.Shard;
 import leaderrank.graph.edge.EdgeSource;
 import leaderrank.graph.inmemory.InMemoryGraph;
 import leaderrank.graph.outofcore.Bin;
 import leaderrank.graph.outofcore.BinFiles;
 import leaderrank.graph.outofcore.EdgeBinning;
-import leaderrank.graph.outofcore.MemoryBudget;
 import leaderrank.graph.outofcore.OutOfCoreGraph;
-import leaderrank.graph.outofcore.Shard;
 import leaderrank.io.CsvEdgeSource;
 import leaderrank.io.RankCsvWriter;
 import leaderrank.utils.Rss;
@@ -46,7 +46,8 @@ public final class Main {
         boolean dense = false;
         boolean inMemory = false;
         long budget = -1;
-        long memoryBytes = -1;
+        int threads = Runtime.getRuntime().availableProcessors();
+        int repeat = 1;
         for (String arg : args) {
             if (arg.equals("--dense")) {
                 dense = true;
@@ -54,35 +55,52 @@ public final class Main {
                 inMemory = true;
             } else if (arg.startsWith("--budget=")) {
                 budget = Long.parseLong(arg.substring("--budget=".length()));
-            } else if (arg.startsWith("--memory=")) {
-                memoryBytes = parseSize(arg.substring("--memory=".length()));
+            } else if (arg.startsWith("--threads=")) {
+                threads = Integer.parseInt(arg.substring("--threads=".length()));
+            } else if (arg.startsWith("--repeat=")) {
+                repeat = Integer.parseInt(arg.substring("--repeat=".length()));
             } else {
                 positionals.add(arg);
             }
         }
         if (positionals.isEmpty()) {
-            System.err.println("Usage: leaderrank <edges.csv> [output.csv] [--dense] [--in-memory] [--memory=SIZE] [--budget=EDGES_PER_BIN]");
+            System.err.println("Usage: leaderrank <edges.csv> [output.csv] [--dense] [--in-memory] [--budget=EDGES_PER_BIN] [--threads=P] [--repeat=N]");
             System.err.println("       leaderrank verify <edges.csv>");
             System.err.println("       leaderrank generate <out.csv> --scale=N --edges=M [--seed=S]");
-            System.err.println("       leaderrank plan <edges.csv> [--budget=EDGES_PER_BIN] [--distribute]");
+            System.err.println("       leaderrank plan <edges.csv> [--budget=EDGES_PER_BIN] [--distribute] [--shards=S]");
             System.exit(2);
             return;
         }
 
         EdgeSource source = new CsvEdgeSource(Path.of(positionals.getFirst()));
+        long buildStart = System.nanoTime();
         Graph graph;
         if (inMemory) {
             graph = InMemoryGraph.build(source);
         } else if (budget > 0) {
             graph = OutOfCoreGraph.build(source, budget);
-        } else if (memoryBytes > 0) {
-            graph = OutOfCoreGraph.build(source, new MemoryBudget(memoryBytes));
         } else {
             graph = OutOfCoreGraph.build(source);
         }
-        RankingEngine engine = dense ? new DenseLeaderRank() : new LeaderRank();
-        LeaderRankResult result = engine.run(graph);
+        double buildMillis = millisSince(buildStart);
 
+        RankingEngine engine = dense ? new DenseLeaderRank() : new ParallelLeaderRank(threads);
+        LeaderRankResult result = null;
+        double computeMillis = 0.0;
+        for (int r = 0; r < repeat; r++) {
+            long computeStart = System.nanoTime();
+            result = engine.run(graph);
+            computeMillis = millisSince(computeStart);
+            if (repeat > 1) {
+                System.out.printf(Locale.ROOT, "compute[%d]: %.1f ms%n", r, computeMillis);
+            }
+        }
+
+        if (!dense) {
+            System.out.println("threads: " + threads);
+        }
+        System.out.printf(Locale.ROOT, "preprocess: %.1f ms%n", buildMillis);
+        System.out.printf(Locale.ROOT, "compute: %.1f ms%n", computeMillis);
         printStats(graph, result);
         if (positionals.size() >= 2) {
             Path output = Path.of(positionals.get(1));
@@ -241,27 +259,17 @@ public final class Main {
         System.out.println("edges: " + graph.edgeCount());
         System.out.println("iterations: " + result.iterations()
                 + (result.converged() ? " (converged)" : " (max reached)"));
+        double mib = 1024.0 * 1024.0;
+        System.out.printf(Locale.ROOT, "heap ceiling (-Xmx): %.1f MiB%n",
+                Runtime.getRuntime().maxMemory() / mib);
         long peakRss = Rss.peakResidentBytes();
         if (peakRss >= 0) {
-            System.out.printf(Locale.ROOT, "peak RSS: %.1f MiB%n", peakRss / (1024.0 * 1024.0));
+            System.out.printf(Locale.ROOT, "peak RSS: %.1f MiB%n", peakRss / mib);
         }
     }
 
-    private static long parseSize(String text) {
-        String trimmed = text.trim();
-        long multiplier = 1;
-        char unit = Character.toUpperCase(trimmed.charAt(trimmed.length() - 1));
-        if (unit == 'K') {
-            multiplier = 1L << 10;
-        } else if (unit == 'M') {
-            multiplier = 1L << 20;
-        } else if (unit == 'G') {
-            multiplier = 1L << 30;
-        }
-        if (multiplier > 1) {
-            trimmed = trimmed.substring(0, trimmed.length() - 1).trim();
-        }
-        return Long.parseLong(trimmed) * multiplier;
+    private static double millisSince(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000.0;
     }
 
     private static void printRanks(Graph graph, double[] scores) {

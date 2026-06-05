@@ -20,22 +20,53 @@ final class ExternalSort {
     }
 
     static void sort(Path binFile, int chunkRecords, Path workDirectory, IntSink sink) throws IOException {
-        List<Path> runs = new ArrayList<>();
+        sort(binFile, chunkRecords, workDirectory, sink, Long.MAX_VALUE);
+    }
+
+    static void sort(Path binFile, int chunkRecords, Path workDirectory, IntSink sink, long availableBytes)
+            throws IOException {
+        List<Path> created = new ArrayList<>();
         try {
-            generateRuns(binFile, chunkRecords, workDirectory, runs);
-            merge(runs, sink);
+            generateRuns(binFile, chunkRecords, workDirectory, created);
+            int maxFanIn = maxFanIn(availableBytes);
+            List<Path> current = new ArrayList<>(created);
+            int generation = 0;
+            while (current.size() > maxFanIn) {
+                List<Path> next = new ArrayList<>();
+                for (int i = 0; i < current.size(); i += maxFanIn) {
+                    List<Path> group = current.subList(i, Math.min(current.size(), i + maxFanIn));
+                    Path merged = workDirectory.resolve("merge-" + generation + "-" + (i / maxFanIn));
+                    created.add(merged);
+                    mergeToFile(group, merged);
+                    next.add(merged);
+                }
+                for (Path consumed : current) {
+                    Files.deleteIfExists(consumed);
+                }
+                current = next;
+                generation++;
+            }
+            merge(current, sink);
         } finally {
-            for (Path run : runs) {
-                Files.deleteIfExists(run);
+            for (Path path : created) {
+                Files.deleteIfExists(path);
             }
         }
+    }
+
+    private static int maxFanIn(long availableBytes) {
+        long fanIn = availableBytes / IO_BUFFER_BYTES;
+        if (fanIn < 2) {
+            return 2;
+        }
+        return (int) Math.min(fanIn, Integer.MAX_VALUE);
     }
 
     private static void generateRuns(Path binFile, int chunkRecords, Path workDirectory, List<Path> runs)
             throws IOException {
         int[] chunk = new int[chunkRecords];
         try (FileChannel channel = FileChannel.open(binFile, StandardOpenOption.READ)) {
-            ByteBuffer buffer = ByteBuffer.allocateDirect(IO_BUFFER_BYTES).order(ByteOrder.LITTLE_ENDIAN);
+            ByteBuffer buffer = ByteBuffer.allocate(IO_BUFFER_BYTES).order(ByteOrder.LITTLE_ENDIAN);
             buffer.position(0).limit(0);
             int filled;
             while ((filled = readChunk(channel, buffer, chunk)) > 0) {
@@ -60,7 +91,7 @@ final class ExternalSort {
         Path run = workDirectory.resolve("run-" + index);
         try (FileChannel channel = FileChannel.open(run,
                 StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
-            ByteBuffer buffer = ByteBuffer.allocateDirect(IO_BUFFER_BYTES).order(ByteOrder.LITTLE_ENDIAN);
+            ByteBuffer buffer = ByteBuffer.allocate(IO_BUFFER_BYTES).order(ByteOrder.LITTLE_ENDIAN);
             for (int i = 0; i < length; i++) {
                 if (buffer.remaining() < Integer.BYTES) {
                     drain(channel, buffer);
@@ -70,6 +101,20 @@ final class ExternalSort {
             drain(channel, buffer);
         }
         return run;
+    }
+
+    private static void mergeToFile(List<Path> runs, Path output) throws IOException {
+        try (FileChannel channel = FileChannel.open(output,
+                StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
+            ByteBuffer buffer = ByteBuffer.allocate(IO_BUFFER_BYTES).order(ByteOrder.LITTLE_ENDIAN);
+            merge(runs, value -> {
+                if (buffer.remaining() < Integer.BYTES) {
+                    drain(channel, buffer);
+                }
+                buffer.putInt(value);
+            });
+            drain(channel, buffer);
+        }
     }
 
     private static void merge(List<Path> runs, IntSink sink) throws IOException {
@@ -125,7 +170,7 @@ final class ExternalSort {
 
         RunCursor(Path run) throws IOException {
             this.channel = FileChannel.open(run, StandardOpenOption.READ);
-            this.buffer = ByteBuffer.allocateDirect(IO_BUFFER_BYTES).order(ByteOrder.LITTLE_ENDIAN);
+            this.buffer = ByteBuffer.allocate(IO_BUFFER_BYTES).order(ByteOrder.LITTLE_ENDIAN);
             this.buffer.position(0).limit(0);
         }
 

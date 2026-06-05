@@ -66,7 +66,7 @@ public final class BinFiles implements Closeable {
     public long[] loadPacked(int binIndex) throws IOException {
         long[] packed = new long[(int) recordCount(binIndex)];
         try (FileChannel channel = FileChannel.open(pathOf(binIndex), StandardOpenOption.READ)) {
-            ByteBuffer buffer = ByteBuffer.allocateDirect(READ_BUFFER_BYTES).order(ByteOrder.LITTLE_ENDIAN);
+            ByteBuffer buffer = ByteBuffer.allocate(READ_BUFFER_BYTES).order(ByteOrder.LITTLE_ENDIAN);
             buffer.position(0).limit(0);
             for (int i = 0; i < packed.length; i++) {
                 if (buffer.remaining() < PAIR_BYTES) {
@@ -86,37 +86,67 @@ public final class BinFiles implements Closeable {
     }
 
     void distribute(EdgeSource source, IdMapper mapper) throws IOException {
+        distribute(source, mapper, Long.MAX_VALUE);
+    }
+
+    void distribute(EdgeSource source, IdMapper mapper, long availableBytes) throws IOException {
         int count = bins.size();
-        FileChannel[] channels = new FileChannel[count];
-        ByteBuffer[] buffers = new ByteBuffer[count];
+        int maxOpenBins = maxOpenBins(availableBytes, count);
+        for (int windowStart = 0; windowStart < count; windowStart += maxOpenBins) {
+            int windowEnd = Math.min(count, windowStart + maxOpenBins);
+            distributeWindow(source, mapper, windowStart, windowEnd);
+        }
+    }
+
+    private static int maxOpenBins(long availableBytes, int count) {
+        if (availableBytes >= (long) count * WRITE_BUFFER_BYTES) {
+            return Math.max(1, count);
+        }
+        long open = availableBytes / WRITE_BUFFER_BYTES;
+        if (open < 1) {
+            return 1;
+        }
+        return (int) Math.min(open, count);
+    }
+
+    private void distributeWindow(EdgeSource source, IdMapper mapper, int windowStart, int windowEnd)
+            throws IOException {
+        int width = windowEnd - windowStart;
+        FileChannel[] channels = new FileChannel[width];
+        ByteBuffer[] buffers = new ByteBuffer[width];
         try {
-            for (int i = 0; i < count; i++) {
-                pathOf(i).toFile().deleteOnExit();
-                channels[i] = FileChannel.open(pathOf(i),
+            for (int i = 0; i < width; i++) {
+                int bin = windowStart + i;
+                pathOf(bin).toFile().deleteOnExit();
+                channels[i] = FileChannel.open(pathOf(bin),
                         StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
                 buffers[i] = ByteBuffer.allocate(WRITE_BUFFER_BYTES).order(ByteOrder.LITTLE_ENDIAN);
             }
             try (EdgeCursor cursor = source.open()) {
                 while (cursor.next()) {
                     int destination = mapper.denseOf(cursor.to());
-                    int sourceVertex = mapper.denseOf(cursor.from());
                     int bin = binOf(destination);
-                    ByteBuffer buffer = buffers[bin];
+                    if (bin < windowStart || bin >= windowEnd) {
+                        continue;
+                    }
+                    int slot = bin - windowStart;
+                    int sourceVertex = mapper.denseOf(cursor.from());
+                    ByteBuffer buffer = buffers[slot];
                     if (oversized[bin]) {
                         if (buffer.remaining() < Integer.BYTES) {
-                            drain(channels[bin], buffer);
+                            drain(channels[slot], buffer);
                         }
                         buffer.putInt(sourceVertex);
                     } else {
                         if (buffer.remaining() < PAIR_BYTES) {
-                            drain(channels[bin], buffer);
+                            drain(channels[slot], buffer);
                         }
                         buffer.putInt(destination);
                         buffer.putInt(sourceVertex);
                     }
                 }
             }
-            for (int i = 0; i < count; i++) {
+            for (int i = 0; i < width; i++) {
                 drain(channels[i], buffers[i]);
             }
         } finally {

@@ -46,7 +46,7 @@ class RankCsvWriterTest {
             }
 
             @Override
-            public SourceCursor openSourceCursor() {
+            public SourceCursor openSourceCursor(int fromDestinationDenseId) {
                 return new SourceCursor() {
                     @Override
                     public int next() {

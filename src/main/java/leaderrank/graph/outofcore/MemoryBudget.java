@@ -12,9 +12,17 @@ public record MemoryBudget(long totalBytes) {
         }
     }
 
-    public int maxEdgesPerBin(int vertexCount) {
+    public static MemoryBudget discover() {
+        return new MemoryBudget(Runtime.getRuntime().maxMemory());
+    }
+
+    public long availableBytes(int vertexCount) {
         long available = totalBytes - RESERVE_BYTES - BYTES_PER_VERTEX * vertexCount;
-        long edges = available / BYTES_PER_PACKED_EDGE;
+        return available < 0 ? 0 : available;
+    }
+
+    public int maxEdgesPerBin(int vertexCount) {
+        long edges = availableBytes(vertexCount) / BYTES_PER_PACKED_EDGE;
         if (edges < 1) {
             return 1;
         }

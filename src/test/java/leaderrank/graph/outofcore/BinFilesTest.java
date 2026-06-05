@@ -91,6 +91,23 @@ class BinFilesTest {
     }
 
     @Test
+    void waveDistributionMatchesSinglePass() throws IOException {
+        EdgeSource source = csv("from,to\n1,2\n1,3\n2,3\n3,1\n3,4\n4,3\n5,3\n6,3\n");
+        Pass1Result pass1 = OutOfCoreGraphPreprocessor.pass1(source);
+        List<Bin> plan = BinPlanner.plan(pass1.sourcesPtr(), 1);
+        try (BinFiles onePass = BinFiles.create(plan);
+                BinFiles waved = BinFiles.create(plan)) {
+            onePass.distribute(source, pass1.mapper());
+            waved.distribute(source, pass1.mapper(), 1L);
+            assertThat(plan.size()).isGreaterThan(1);
+            for (int b = 0; b < plan.size(); b++) {
+                assertThat(Files.readAllBytes(waved.pathOf(b)))
+                        .isEqualTo(Files.readAllBytes(onePass.pathOf(b)));
+            }
+        }
+    }
+
+    @Test
     void hyperNodeLandsInItsOwnOversizedBin() throws IOException {
         StringBuilder text = new StringBuilder("from,to\n");
         for (int i = 1; i <= 10; i++) {

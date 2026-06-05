@@ -67,7 +67,7 @@ public final class DenseLeaderRank implements RankingEngine {
             scores = next;
             next = swap;
 
-            if (delta < tolerance) {
+            if (delta < tolerance * n) {
                 converged = true;
                 break;
             }

@@ -19,5 +19,9 @@ public interface Graph {
 
     PrimitiveIterator.OfInt sourcesOf(int destinationDenseId) throws IOException;
 
-    SourceCursor openSourceCursor() throws IOException;
+    SourceCursor openSourceCursor(int fromDestinationDenseId) throws IOException;
+
+    default SourceCursor openSourceCursor() throws IOException {
+        return openSourceCursor(0);
+    }
 }
