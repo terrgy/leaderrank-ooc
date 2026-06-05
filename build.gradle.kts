@@ -1,3 +1,5 @@
+import org.gradle.kotlin.dsl.repositories
+
 plugins {
     java
     application
@@ -22,6 +24,7 @@ application {
 
 dependencies {
     implementation("org.apache.commons:commons-csv:1.11.0")
+    implementation("it.unimi.dsi:fastutil-core:8.5.18")
 
     testImplementation(platform("org.junit:junit-bom:5.11.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")

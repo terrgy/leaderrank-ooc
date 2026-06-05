@@ -1,7 +1,7 @@
 package leaderrank.graph.inmemory;
 
 import leaderrank.graph.Graph;
-import leaderrank.graph.IdMapper;
+import leaderrank.utils.IdMapper;
 import leaderrank.graph.edge.EdgeCursor;
 import leaderrank.graph.edge.EdgeSource;
 
