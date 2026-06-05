@@ -20,6 +20,7 @@ import leaderrank.graph.outofcore.BinFiles;
 import leaderrank.graph.outofcore.EdgeBinning;
 import leaderrank.graph.outofcore.MemoryBudget;
 import leaderrank.graph.outofcore.OutOfCoreGraph;
+import leaderrank.graph.outofcore.Shard;
 import leaderrank.io.CsvEdgeSource;
 import leaderrank.io.RankCsvWriter;
 import leaderrank.utils.Rss;
@@ -157,12 +158,15 @@ public final class Main {
         String input = null;
         long budget = DEFAULT_BIN_BUDGET;
         boolean distribute = false;
+        int shardCount = -1;
         for (int i = 1; i < args.length; i++) {
             String arg = args[i];
             if (arg.startsWith("--budget=")) {
                 budget = Long.parseLong(arg.substring("--budget=".length()));
             } else if (arg.equals("--distribute")) {
                 distribute = true;
+            } else if (arg.startsWith("--shards=")) {
+                shardCount = Integer.parseInt(arg.substring("--shards=".length()));
             } else if (input == null) {
                 input = arg;
             } else {
@@ -172,12 +176,16 @@ public final class Main {
             }
         }
         if (input == null) {
-            System.err.println("Usage: leaderrank plan <edges.csv> [--budget=EDGES_PER_BIN] [--distribute]");
+            System.err.println("Usage: leaderrank plan <edges.csv> [--budget=EDGES_PER_BIN] [--distribute] [--shards=S]");
             System.exit(2);
             return;
         }
 
         EdgeSource source = new CsvEdgeSource(Path.of(input));
+        if (shardCount > 0) {
+            printShards(EdgeBinning.shards(source, shardCount));
+            return;
+        }
         if (!distribute) {
             printPlan(EdgeBinning.plan(source, budget), budget);
             return;
@@ -208,6 +216,24 @@ public final class Main {
                     i, bin.begin(), bin.end(), bin.edgeCount(),
                     bin.oversized() ? "OVERSIZED" : "normal");
         }
+    }
+
+    private static void printShards(List<Shard> shards) {
+        long vertices = shards.isEmpty() ? 0 : shards.get(shards.size() - 1).end();
+        long total = shards.stream().mapToLong(Shard::edgeCount).sum();
+        long max = shards.stream().mapToLong(Shard::edgeCount).max().orElse(0);
+        long min = shards.stream().mapToLong(Shard::edgeCount).min().orElse(0);
+        double mean = shards.isEmpty() ? 0.0 : (double) total / shards.size();
+        System.out.println("vertices: " + vertices);
+        System.out.println("edges: " + total);
+        System.out.println("shards: " + shards.size());
+        for (int i = 0; i < shards.size(); i++) {
+            Shard shard = shards.get(i);
+            System.out.printf(Locale.ROOT, "  shard %d: dests [%d, %d) edges=%d%n",
+                    i, shard.begin(), shard.end(), shard.edgeCount());
+        }
+        System.out.printf(Locale.ROOT, "balance: min=%d mean=%.1f max=%d (max/mean=%.2f)%n",
+                min, mean, max, mean > 0.0 ? max / mean : 0.0);
     }
 
     private static void printStats(Graph graph, LeaderRankResult result) {

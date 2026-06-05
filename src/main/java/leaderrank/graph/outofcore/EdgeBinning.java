@@ -14,6 +14,10 @@ public final class EdgeBinning {
         return BinPlanner.plan(OutOfCoreGraphPreprocessor.pass1(source).sourcesPtr(), maxEdgesPerBin);
     }
 
+    public static List<Shard> shards(EdgeSource source, int shardCount) throws IOException {
+        return ShardPlanner.plan(OutOfCoreGraphPreprocessor.pass1(source).sourcesPtr(), shardCount);
+    }
+
     public static BinFiles bin(EdgeSource source, long maxEdgesPerBin) throws IOException {
         Pass1Result pass1 = OutOfCoreGraphPreprocessor.pass1(source);
         BinFiles files = BinFiles.create(BinPlanner.plan(pass1.sourcesPtr(), maxEdgesPerBin));
