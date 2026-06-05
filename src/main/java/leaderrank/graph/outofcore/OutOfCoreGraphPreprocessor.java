@@ -12,13 +12,15 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
+import java.util.List;
 
 final class OutOfCoreGraphPreprocessor {
 
-    static OutOfCorePreprocessingData process(EdgeSource source, Path sourcesPath) throws IOException {
+    static Pass1Result pass1(EdgeSource source) throws IOException {
         IdMapper mapper = new IdMapper();
         IntArrayList inDegrees = new IntArrayList();
         IntArrayList outDegrees = new IntArrayList();
+        long edgeCount = 0;
 
         try (EdgeCursor cursor = source.open()) {
             while (cursor.next()) {
@@ -27,35 +29,73 @@ final class OutOfCoreGraphPreprocessor {
                 growTo(inDegrees, outDegrees, mapper.size());
                 inDegrees.set(denseTo, inDegrees.getInt(denseTo) + 1);
                 outDegrees.set(denseFrom, outDegrees.getInt(denseFrom) + 1);
+                edgeCount++;
             }
         }
 
-        int[] sourcesPtr = prefixSums(inDegrees);
-        long edgesCount = 0;
-        int[] sources = new int[sourcesPtr[inDegrees.size()]];
-        int[] writePos = sourcesPtr.clone();
+        return new Pass1Result(mapper, prefixSums(inDegrees), outDegrees.toIntArray(), edgeCount);
+    }
 
-        try (EdgeCursor cursor = source.open()) {
-            while (cursor.next()) {
-                int denseTo = mapper.denseOf(cursor.to());
-                sources[writePos[denseTo]++] = mapper.denseOf(cursor.from());
-                ++edgesCount;
-            }
+    static OutOfCorePreprocessingData process(EdgeSource source, Path sourcesPath, long maxEdgesPerBin)
+            throws IOException {
+        return assemble(source, pass1(source), sourcesPath, clampToInt(maxEdgesPerBin));
+    }
+
+    static OutOfCorePreprocessingData process(EdgeSource source, Path sourcesPath, MemoryBudget budget)
+            throws IOException {
+        Pass1Result pass1 = pass1(source);
+        return assemble(source, pass1, sourcesPath, budget.maxEdgesPerBin(pass1.outDegrees().length));
+    }
+
+    private static OutOfCorePreprocessingData assemble(EdgeSource source, Pass1Result pass1, Path sourcesPath,
+            int maxEdgesPerBin) throws IOException {
+        List<Bin> bins = BinPlanner.plan(pass1.sourcesPtr(), maxEdgesPerBin);
+
+        try (BinFiles binFiles = BinFiles.create(bins)) {
+            binFiles.distribute(source, pass1.mapper());
+            writeSortedSources(binFiles, sourcesPath, maxEdgesPerBin);
         }
-
-        for (int d = 0; d < inDegrees.size(); d++) {
-            Arrays.sort(sources, sourcesPtr[d], sourcesPtr[d + 1]);
-        }
-
-        writeSources(sources, sourcesPath);
 
         return new OutOfCorePreprocessingData(
-                sourcesPtr,
-                outDegrees.toIntArray(),
-                mapper.originalIds(),
-                edgesCount,
+                pass1.sourcesPtr(),
+                pass1.outDegrees(),
+                pass1.mapper().originalIds(),
+                pass1.edgeCount(),
                 sourcesPath
         );
+    }
+
+    private static int clampToInt(long value) {
+        return (int) Math.max(1, Math.min(value, Integer.MAX_VALUE));
+    }
+
+    private static void writeSortedSources(BinFiles binFiles, Path sourcesPath, int chunkRecords)
+            throws IOException {
+        List<Bin> bins = binFiles.bins();
+        try (FileChannel channel = FileChannel.open(sourcesPath,
+                StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
+            ByteBuffer buffer = ByteBuffer.allocateDirect(1 << 20).order(ByteOrder.LITTLE_ENDIAN);
+            IntSink sink = value -> putSource(channel, buffer, value);
+            for (int b = 0; b < bins.size(); b++) {
+                if (bins.get(b).oversized()) {
+                    ExternalSort.sort(binFiles.pathOf(b), chunkRecords, binFiles.directory(), sink);
+                } else {
+                    long[] packed = binFiles.loadPacked(b);
+                    Arrays.sort(packed);
+                    for (long value : packed) {
+                        sink.accept((int) value);
+                    }
+                }
+            }
+            drain(channel, buffer);
+        }
+    }
+
+    private static void putSource(FileChannel channel, ByteBuffer buffer, int value) throws IOException {
+        if (buffer.remaining() < Integer.BYTES) {
+            drain(channel, buffer);
+        }
+        buffer.putInt(value);
     }
 
     private static void growTo(IntArrayList inDegrees, IntArrayList outDegrees, int newSize) {
@@ -72,20 +112,6 @@ final class OutOfCoreGraphPreprocessor {
             sums[i + 1] = sums[i] + values.getInt(i);
         }
         return sums;
-    }
-
-    private static void writeSources(int[] sources, Path path) throws IOException {
-        try (FileChannel channel = FileChannel.open(path,
-                StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
-            ByteBuffer buffer = ByteBuffer.allocateDirect(1 << 20).order(ByteOrder.LITTLE_ENDIAN);
-            for (int value : sources) {
-                if (!buffer.hasRemaining()) {
-                    drain(channel, buffer);
-                }
-                buffer.putInt(value);
-            }
-            drain(channel, buffer);
-        }
     }
 
     private static void drain(FileChannel channel, ByteBuffer buffer) throws IOException {

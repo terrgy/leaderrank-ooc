@@ -13,20 +13,28 @@ import leaderrank.core.LeaderRankResult;
 import leaderrank.core.RankingEngine;
 import leaderrank.gen.RmatGenerator;
 import leaderrank.graph.Graph;
-import leaderrank.graph.GraphFactory;
 import leaderrank.graph.edge.EdgeSource;
 import leaderrank.graph.inmemory.InMemoryGraph;
+import leaderrank.graph.outofcore.Bin;
+import leaderrank.graph.outofcore.BinFiles;
+import leaderrank.graph.outofcore.EdgeBinning;
+import leaderrank.graph.outofcore.MemoryBudget;
 import leaderrank.graph.outofcore.OutOfCoreGraph;
 import leaderrank.io.CsvEdgeSource;
 import leaderrank.io.RankCsvWriter;
+import leaderrank.utils.Rss;
 
 public final class Main {
+
+    private static final long DEFAULT_BIN_BUDGET = 1L << 20;
 
     public static void main(String[] args) throws IOException {
         if (args.length >= 1 && args[0].equals("verify")) {
             verify(args);
         } else if (args.length >= 1 && args[0].equals("generate")) {
             generate(args);
+        } else if (args.length >= 1 && args[0].equals("plan")) {
+            plan(args);
         } else {
             rank(args);
         }
@@ -36,26 +44,41 @@ public final class Main {
         List<String> positionals = new ArrayList<>();
         boolean dense = false;
         boolean inMemory = false;
+        long budget = -1;
+        long memoryBytes = -1;
         for (String arg : args) {
             if (arg.equals("--dense")) {
                 dense = true;
             } else if (arg.equals("--in-memory")) {
                 inMemory = true;
+            } else if (arg.startsWith("--budget=")) {
+                budget = Long.parseLong(arg.substring("--budget=".length()));
+            } else if (arg.startsWith("--memory=")) {
+                memoryBytes = parseSize(arg.substring("--memory=".length()));
             } else {
                 positionals.add(arg);
             }
         }
         if (positionals.isEmpty()) {
-            System.err.println("Usage: leaderrank <edges.csv> [output.csv] [--dense] [--in-memory]");
+            System.err.println("Usage: leaderrank <edges.csv> [output.csv] [--dense] [--in-memory] [--memory=SIZE] [--budget=EDGES_PER_BIN]");
             System.err.println("       leaderrank verify <edges.csv>");
             System.err.println("       leaderrank generate <out.csv> --scale=N --edges=M [--seed=S]");
+            System.err.println("       leaderrank plan <edges.csv> [--budget=EDGES_PER_BIN] [--distribute]");
             System.exit(2);
             return;
         }
 
         EdgeSource source = new CsvEdgeSource(Path.of(positionals.getFirst()));
-        GraphFactory factory = inMemory ? InMemoryGraph::build : OutOfCoreGraph::build;
-        Graph graph = factory.create(source);
+        Graph graph;
+        if (inMemory) {
+            graph = InMemoryGraph.build(source);
+        } else if (budget > 0) {
+            graph = OutOfCoreGraph.build(source, budget);
+        } else if (memoryBytes > 0) {
+            graph = OutOfCoreGraph.build(source, new MemoryBudget(memoryBytes));
+        } else {
+            graph = OutOfCoreGraph.build(source);
+        }
         RankingEngine engine = dense ? new DenseLeaderRank() : new LeaderRank();
         LeaderRankResult result = engine.run(graph);
 
@@ -130,11 +153,89 @@ public final class Main {
                 + " vertices to " + output);
     }
 
+    private static void plan(String[] args) throws IOException {
+        String input = null;
+        long budget = DEFAULT_BIN_BUDGET;
+        boolean distribute = false;
+        for (int i = 1; i < args.length; i++) {
+            String arg = args[i];
+            if (arg.startsWith("--budget=")) {
+                budget = Long.parseLong(arg.substring("--budget=".length()));
+            } else if (arg.equals("--distribute")) {
+                distribute = true;
+            } else if (input == null) {
+                input = arg;
+            } else {
+                System.err.println("unexpected argument: " + arg);
+                System.exit(2);
+                return;
+            }
+        }
+        if (input == null) {
+            System.err.println("Usage: leaderrank plan <edges.csv> [--budget=EDGES_PER_BIN] [--distribute]");
+            System.exit(2);
+            return;
+        }
+
+        EdgeSource source = new CsvEdgeSource(Path.of(input));
+        if (!distribute) {
+            printPlan(EdgeBinning.plan(source, budget), budget);
+            return;
+        }
+
+        try (BinFiles files = EdgeBinning.bin(source, budget)) {
+            printPlan(files.bins(), budget);
+            System.out.println("distributed to bin files:");
+            for (int i = 0; i < files.bins().size(); i++) {
+                Bin bin = files.bins().get(i);
+                System.out.printf(Locale.ROOT, "  bin %d: planned=%d written=%d%s%n",
+                        i, bin.edgeCount(), files.recordCount(i),
+                        bin.oversized() ? " OVERSIZED" : "");
+            }
+        }
+    }
+
+    private static void printPlan(List<Bin> bins, long budget) {
+        long vertices = bins.isEmpty() ? 0 : bins.get(bins.size() - 1).end();
+        long edges = bins.stream().mapToLong(Bin::edgeCount).sum();
+        System.out.println("vertices: " + vertices);
+        System.out.println("edges: " + edges);
+        System.out.println("budget (edges/bin): " + budget);
+        System.out.println("bins: " + bins.size());
+        for (int i = 0; i < bins.size(); i++) {
+            Bin bin = bins.get(i);
+            System.out.printf(Locale.ROOT, "  bin %d: dests [%d, %d) edges=%d %s%n",
+                    i, bin.begin(), bin.end(), bin.edgeCount(),
+                    bin.oversized() ? "OVERSIZED" : "normal");
+        }
+    }
+
     private static void printStats(Graph graph, LeaderRankResult result) {
         System.out.println("vertices: " + graph.vertexCount());
         System.out.println("edges: " + graph.edgeCount());
         System.out.println("iterations: " + result.iterations()
                 + (result.converged() ? " (converged)" : " (max reached)"));
+        long peakRss = Rss.peakResidentBytes();
+        if (peakRss >= 0) {
+            System.out.printf(Locale.ROOT, "peak RSS: %.1f MiB%n", peakRss / (1024.0 * 1024.0));
+        }
+    }
+
+    private static long parseSize(String text) {
+        String trimmed = text.trim();
+        long multiplier = 1;
+        char unit = Character.toUpperCase(trimmed.charAt(trimmed.length() - 1));
+        if (unit == 'K') {
+            multiplier = 1L << 10;
+        } else if (unit == 'M') {
+            multiplier = 1L << 20;
+        } else if (unit == 'G') {
+            multiplier = 1L << 30;
+        }
+        if (multiplier > 1) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1).trim();
+        }
+        return Long.parseLong(trimmed) * multiplier;
     }
 
     private static void printRanks(Graph graph, double[] scores) {

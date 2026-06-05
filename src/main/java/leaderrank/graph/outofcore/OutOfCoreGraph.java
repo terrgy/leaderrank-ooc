@@ -19,6 +19,7 @@ import java.util.PrimitiveIterator;
 
 public final class OutOfCoreGraph implements Graph {
     static final int SOURCES_BUFFER_BYTES = 1024;
+    static final MemoryBudget DEFAULT_BUDGET = new MemoryBudget(256L << 20);
 
     private final OutOfCorePreprocessingData data;
 
@@ -27,9 +28,21 @@ public final class OutOfCoreGraph implements Graph {
     }
 
     public static Graph build(EdgeSource source) throws IOException {
+        return build(source, DEFAULT_BUDGET);
+    }
+
+    public static Graph build(EdgeSource source, MemoryBudget budget) throws IOException {
+        return new OutOfCoreGraph(OutOfCoreGraphPreprocessor.process(source, sourcesFile(), budget));
+    }
+
+    public static Graph build(EdgeSource source, long maxEdgesPerBin) throws IOException {
+        return new OutOfCoreGraph(OutOfCoreGraphPreprocessor.process(source, sourcesFile(), maxEdgesPerBin));
+    }
+
+    private static Path sourcesFile() throws IOException {
         Path sourcesFile = Files.createTempFile("leaderrank-", ".sources");
         sourcesFile.toFile().deleteOnExit();
-        return new OutOfCoreGraph(OutOfCoreGraphPreprocessor.process(source, sourcesFile));
+        return sourcesFile;
     }
 
     @Override
