@@ -5,7 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.io.StringReader;
+import java.util.ArrayList;
+import java.util.List;
 import leaderrank.graph.Graph;
+import leaderrank.graph.VertexSources;
 import org.junit.jupiter.api.Test;
 
 class EdgeListReaderTest {
@@ -14,15 +17,26 @@ class EdgeListReaderTest {
         return new EdgeListReader().read(new StringReader(csv));
     }
 
+    private static List<Integer> inNeighbors(Graph graph, int destinationDenseId) {
+        List<Integer> result = new ArrayList<>();
+        VertexSources vertexSources = graph.getVertexSources(destinationDenseId);
+        while (!vertexSources.isEnd()) {
+            result.add(vertexSources.getNextSource());
+        }
+        return result;
+    }
+
     @Test
     void readsSimpleChain() throws IOException {
         Graph g = read("from,to\n0,1\n1,2\n");
 
         assertThat(g.vertexCount()).isEqualTo(3);
         assertThat(g.edgeCount()).isEqualTo(2);
-        assertThat(g.sources()).containsExactly(0, 1);
-        assertThat(g.targets()).containsExactly(1, 2);
-        assertThat(g.outDegrees()).containsExactly(1, 1, 0);
+        assertThat(inNeighbors(g, 1)).containsExactly(0);
+        assertThat(inNeighbors(g, 2)).containsExactly(1);
+        assertThat(g.outDegree(0)).isEqualTo(1);
+        assertThat(g.outDegree(1)).isEqualTo(1);
+        assertThat(g.outDegree(2)).isEqualTo(0);
     }
 
     @Test
@@ -33,8 +47,8 @@ class EdgeListReaderTest {
         assertThat(g.originalId(0)).isEqualTo(10);
         assertThat(g.originalId(1)).isEqualTo(20);
         assertThat(g.originalId(2)).isEqualTo(30);
-        assertThat(g.sources()).containsExactly(0, 1);
-        assertThat(g.targets()).containsExactly(1, 2);
+        assertThat(inNeighbors(g, 1)).containsExactly(0);
+        assertThat(inNeighbors(g, 2)).containsExactly(1);
     }
 
     @Test
@@ -42,8 +56,8 @@ class EdgeListReaderTest {
         Graph g = read("from,to,weight\n  0 , 1 , 9\n");
 
         assertThat(g.edgeCount()).isEqualTo(1);
-        assertThat(g.sources()).containsExactly(0);
-        assertThat(g.targets()).containsExactly(1);
+        assertThat(g.vertexCount()).isEqualTo(2);
+        assertThat(inNeighbors(g, 1)).containsExactly(0);
     }
 
     @Test

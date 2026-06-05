@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.io.IOException;
 import java.io.StringWriter;
 import leaderrank.graph.Graph;
+import leaderrank.graph.InMemoryGraph;
 import org.junit.jupiter.api.Test;
 
 class RankCsvWriterTest {
@@ -18,7 +19,7 @@ class RankCsvWriterTest {
 
     @Test
     void writesHeaderAndRowsSortedByOriginalVertexId() throws IOException {
-        Graph graph = new Graph(3, new int[] {0, 1}, new int[] {1, 2}, new int[] {1, 1, 0},
+        Graph graph = new InMemoryGraph(3, new int[] {0, 1}, new int[] {1, 2}, new int[] {1, 1, 0},
                 new int[] {50, 10, 30});
         double[] scores = {0.5, 0.25, 0.125};
 
@@ -27,7 +28,7 @@ class RankCsvWriterTest {
 
     @Test
     void valuesRoundTripBackToScores() throws IOException {
-        Graph graph = new Graph(2, new int[] {0}, new int[] {1}, new int[] {1, 0}, new int[] {7, 9});
+        Graph graph = new InMemoryGraph(2, new int[] {0}, new int[] {1}, new int[] {1, 0}, new int[] {7, 9});
         double[] scores = {1.3333333333333333, 0.6666666666666666};
 
         String output = write(graph, scores);
@@ -42,7 +43,7 @@ class RankCsvWriterTest {
 
     @Test
     void rejectsLengthMismatch() {
-        Graph graph = new Graph(2, new int[] {0}, new int[] {1}, new int[] {1, 0}, new int[] {0, 1});
+        Graph graph = new InMemoryGraph(2, new int[] {0}, new int[] {1}, new int[] {1, 0}, new int[] {0, 1});
 
         assertThatThrownBy(() -> write(graph, new double[] {1.0}))
                 .isInstanceOf(IllegalArgumentException.class);

@@ -2,8 +2,9 @@ package leaderrank.core;
 
 import java.util.Arrays;
 import leaderrank.graph.Graph;
+import leaderrank.graph.VertexSources;
 
-public final class LeaderRank {
+public final class LeaderRank implements RankingEngine {
 
     public static final double DEFAULT_TOLERANCE = 1e-8;
     public static final int DEFAULT_MAX_ITERATIONS = 100;
@@ -26,15 +27,12 @@ public final class LeaderRank {
         this.maxIterations = maxIterations;
     }
 
+    @Override
     public LeaderRankResult run(Graph graph) {
         int n = graph.vertexCount();
         if (n == 0) {
             return new LeaderRankResult(new double[0], 0, true);
         }
-
-        int[] sources = graph.sources();
-        int[] targets = graph.targets();
-        int[] outDegrees = graph.outDegrees();
 
         double[] scores = new double[n];
         Arrays.fill(scores, 1.0);
@@ -49,19 +47,22 @@ public final class LeaderRank {
             iterations++;
 
             for (int v = 0; v < n; v++) {
-                contrib[v] = scores[v] / (outDegrees[v] + 1);
+                contrib[v] = scores[v] / (graph.outDegree(v) + 1);
             }
 
             double base = ground / n;
-            Arrays.fill(next, base);
-
             double nextGround = 0.0;
             for (int v = 0; v < n; v++) {
                 nextGround += contrib[v];
             }
 
-            for (int e = 0; e < sources.length; e++) {
-                next[targets[e]] += contrib[sources[e]];
+            for (int i = 0; i < n; i++) {
+                double sum = base;
+                VertexSources vertexSources = graph.getVertexSources(i);
+                while (!vertexSources.isEnd()) {
+                    sum += contrib[vertexSources.getNextSource()];
+                }
+                next[i] = sum;
             }
 
             double delta = Math.abs(nextGround - ground);

@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import leaderrank.graph.Graph;
 import leaderrank.graph.IdMapper;
+import leaderrank.graph.InMemoryGraph;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -61,6 +62,6 @@ public final class EdgeListReader {
         for (int sourceId : sourceIds) {
             outDegrees[sourceId]++;
         }
-        return new Graph(vertexCount, sourceIds, targetIds, outDegrees, mapper.originalIds());
+        return new InMemoryGraph(vertexCount, sourceIds, targetIds, outDegrees, mapper.originalIds());
     }
 }

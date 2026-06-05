@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.within;
 import java.io.IOException;
 import java.io.StringReader;
 import leaderrank.graph.Graph;
+import leaderrank.graph.InMemoryGraph;
 import leaderrank.io.EdgeListReader;
 import org.junit.jupiter.api.Test;
 
@@ -98,7 +99,7 @@ class LeaderRankTest {
 
     @Test
     void handlesEmptyGraph() {
-        Graph empty = new Graph(0, new int[0], new int[0], new int[0], new int[0]);
+        Graph empty = new InMemoryGraph(0, new int[0], new int[0], new int[0], new int[0]);
         LeaderRankResult result = new LeaderRank().run(empty);
         assertThat(result.scores()).isEmpty();
         assertThat(result.converged()).isTrue();
