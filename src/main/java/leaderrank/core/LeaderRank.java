@@ -1,7 +1,9 @@
 package leaderrank.core;
 
+import java.io.IOException;
 import java.util.Arrays;
 import leaderrank.graph.Graph;
+import leaderrank.graph.source.SourceCursor;
 
 public final class LeaderRank implements RankingEngine {
 
@@ -27,7 +29,7 @@ public final class LeaderRank implements RankingEngine {
     }
 
     @Override
-    public LeaderRankResult run(Graph graph) {
+    public LeaderRankResult run(Graph graph) throws IOException {
         int n = graph.vertexCount();
         if (n == 0) {
             return new LeaderRankResult(new double[0], 0, true);
@@ -55,13 +57,15 @@ public final class LeaderRank implements RankingEngine {
                 nextGround += contrib[v];
             }
 
-            for (int i = 0; i < n; i++) {
-                double sum = base;
-                var iterator = graph.sourcesOf(i);
-                while (iterator.hasNext()) {
-                    sum += contrib[iterator.nextInt()];
+            try (SourceCursor cursor = graph.openSourceCursor()) {
+                for (int i = 0; i < n; i++) {
+                    int degree = graph.inDegree(i);
+                    double sum = base;
+                    for (int k = 0; k < degree; k++) {
+                        sum += contrib[cursor.next()];
+                    }
+                    next[i] = sum;
                 }
-                next[i] = sum;
             }
 
             double delta = Math.abs(nextGround - ground);

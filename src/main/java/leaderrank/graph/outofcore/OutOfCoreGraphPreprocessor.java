@@ -6,14 +6,16 @@ import leaderrank.graph.edge.EdgeCursor;
 import leaderrank.graph.edge.EdgeSource;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.channels.FileChannel;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 
 final class OutOfCoreGraphPreprocessor {
 
-    private OutOfCoreGraphPreprocessor() {
-    }
-
-    static OutOfCorePreprocessingData process(EdgeSource source) throws IOException {
+    static OutOfCorePreprocessingData process(EdgeSource source, Path sourcesPath) throws IOException {
         IdMapper mapper = new IdMapper();
         IntArrayList inDegrees = new IntArrayList();
         IntArrayList outDegrees = new IntArrayList();
@@ -29,6 +31,7 @@ final class OutOfCoreGraphPreprocessor {
         }
 
         int[] sourcesPtr = prefixSums(inDegrees);
+        long edgesCount = 0;
         int[] sources = new int[sourcesPtr[inDegrees.size()]];
         int[] writePos = sourcesPtr.clone();
 
@@ -36,6 +39,7 @@ final class OutOfCoreGraphPreprocessor {
             while (cursor.next()) {
                 int denseTo = mapper.denseOf(cursor.to());
                 sources[writePos[denseTo]++] = mapper.denseOf(cursor.from());
+                ++edgesCount;
             }
         }
 
@@ -43,11 +47,14 @@ final class OutOfCoreGraphPreprocessor {
             Arrays.sort(sources, sourcesPtr[d], sourcesPtr[d + 1]);
         }
 
+        writeSources(sources, sourcesPath);
+
         return new OutOfCorePreprocessingData(
                 sourcesPtr,
-                sources,
                 outDegrees.toIntArray(),
-                mapper.originalIds()
+                mapper.originalIds(),
+                edgesCount,
+                sourcesPath
         );
     }
 
@@ -65,5 +72,27 @@ final class OutOfCoreGraphPreprocessor {
             sums[i + 1] = sums[i] + values.getInt(i);
         }
         return sums;
+    }
+
+    private static void writeSources(int[] sources, Path path) throws IOException {
+        try (FileChannel channel = FileChannel.open(path,
+                StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
+            ByteBuffer buffer = ByteBuffer.allocateDirect(1 << 20).order(ByteOrder.LITTLE_ENDIAN);
+            for (int value : sources) {
+                if (!buffer.hasRemaining()) {
+                    drain(channel, buffer);
+                }
+                buffer.putInt(value);
+            }
+            drain(channel, buffer);
+        }
+    }
+
+    private static void drain(FileChannel channel, ByteBuffer buffer) throws IOException {
+        buffer.flip();
+        while (buffer.hasRemaining()) {
+            channel.write(buffer);
+        }
+        buffer.clear();
     }
 }

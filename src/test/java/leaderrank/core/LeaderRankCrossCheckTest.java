@@ -33,7 +33,7 @@ class LeaderRankCrossCheckTest {
         return factory.create(new CsvEdgeSource(() -> new StringReader(csv)));
     }
 
-    private void assertEnginesAgree(Graph graph) {
+    private void assertEnginesAgree(Graph graph) throws IOException{
         double[] streaming = new LeaderRank().run(graph).scores();
         double[] truth = new DenseLeaderRank().run(graph).scores();
         assertThat(streaming).hasSameSizeAs(truth);

@@ -1,6 +1,7 @@
 package leaderrank.graph.inmemory;
 
 import leaderrank.graph.Graph;
+import leaderrank.graph.source.SourceCursor;
 import leaderrank.utils.IdMapper;
 import leaderrank.graph.edge.EdgeCursor;
 import leaderrank.graph.edge.EdgeSource;
@@ -64,13 +65,18 @@ public final class InMemoryGraph implements Graph {
     }
 
     @Override
-    public int edgeCount() {
+    public long edgeCount() {
         return edgeCount;
     }
 
     @Override
     public int outDegree(int denseId) {
         return outDegrees.get(denseId);
+    }
+
+    @Override
+    public int inDegree(int denseId) {
+        return sources.get(denseId).size();
     }
 
     @Override
@@ -81,5 +87,26 @@ public final class InMemoryGraph implements Graph {
     @Override
     public PrimitiveIterator.OfInt sourcesOf(int destinationDenseId) {
         return sources.get(destinationDenseId).stream().mapToInt(Integer::intValue).iterator();
+    }
+
+    @Override
+    public SourceCursor openSourceCursor() {
+        return new SourceCursor() {
+            private int destination = 0;
+            private int index = 0;
+
+            @Override
+            public int next() {
+                while (index >= sources.get(destination).size()) {
+                    destination++;
+                    index = 0;
+                }
+                return sources.get(destination).get(index++);
+            }
+
+            @Override
+            public void close() {
+            }
+        };
     }
 }

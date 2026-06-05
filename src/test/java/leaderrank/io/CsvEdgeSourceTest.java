@@ -18,7 +18,7 @@ class CsvEdgeSourceTest {
         return InMemoryGraph.build(new CsvEdgeSource(() -> new StringReader(csv)));
     }
 
-    private static List<Integer> inNeighbors(Graph graph, int destinationDenseId) {
+    private static List<Integer> inNeighbors(Graph graph, int destinationDenseId) throws IOException {
         List<Integer> result = new ArrayList<>();
         PrimitiveIterator.OfInt sources = graph.sourcesOf(destinationDenseId);
         while (sources.hasNext()) {

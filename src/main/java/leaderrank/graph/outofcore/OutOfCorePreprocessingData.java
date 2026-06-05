@@ -1,3 +1,5 @@
 package leaderrank.graph.outofcore;
 
-public record OutOfCorePreprocessingData (int[] sourcesPtr, int[] sources, int[] outDegrees, int[] originalIds) {}
+import java.nio.file.Path;
+
+public record OutOfCorePreprocessingData (int[] sourcesPtr, int[] outDegrees, int[] originalIds, long edgeCount, Path sourcesFile) {}

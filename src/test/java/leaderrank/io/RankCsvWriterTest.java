@@ -8,6 +8,7 @@ import java.io.StringWriter;
 import java.util.PrimitiveIterator;
 import java.util.stream.IntStream;
 import leaderrank.graph.Graph;
+import leaderrank.graph.source.SourceCursor;
 import org.junit.jupiter.api.Test;
 
 class RankCsvWriterTest {
@@ -20,7 +21,7 @@ class RankCsvWriterTest {
             }
 
             @Override
-            public int edgeCount() {
+            public long edgeCount() {
                 return 0;
             }
 
@@ -37,6 +38,25 @@ class RankCsvWriterTest {
             @Override
             public int originalId(int denseId) {
                 return originalIds[denseId];
+            }
+
+            @Override
+            public int inDegree(int denseId) {
+                return 0;
+            }
+
+            @Override
+            public SourceCursor openSourceCursor() {
+                return new SourceCursor() {
+                    @Override
+                    public int next() {
+                        throw new UnsupportedOperationException();
+                    }
+
+                    @Override
+                    public void close() {
+                    }
+                };
             }
         };
     }

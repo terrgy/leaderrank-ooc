@@ -2,6 +2,8 @@ package leaderrank.core;
 
 import leaderrank.graph.Graph;
 
+import java.io.IOException;
+
 public final class DenseLeaderRank implements RankingEngine {
 
     public static final double DEFAULT_TOLERANCE = 1e-8;
@@ -26,7 +28,7 @@ public final class DenseLeaderRank implements RankingEngine {
     }
 
     @Override
-    public LeaderRankResult run(Graph graph) {
+    public LeaderRankResult run(Graph graph) throws IOException {
         int n = graph.vertexCount();
         if (n == 0) {
             return new LeaderRankResult(new double[0], 0, true);
@@ -79,7 +81,7 @@ public final class DenseLeaderRank implements RankingEngine {
         return new LeaderRankResult(ranks, iterations, converged);
     }
 
-    private static double[][] buildTransition(Graph graph, int size, int ground) {
+    private static double[][] buildTransition(Graph graph, int size, int ground) throws IOException {
         int n = ground;
         double[][] transition = new double[size][size];
 
