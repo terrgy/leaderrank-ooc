@@ -29,19 +29,20 @@ public final class RankCsvWriter {
             throw new IllegalArgumentException("scores length must equal vertexCount");
         }
         try (CSVPrinter printer = new CSVPrinter(out, FORMAT)) {
-            for (int vertex : orderByOriginalId(graph)) {
+            for (int vertex : orderByRank(graph, scores)) {
                 printer.printRecord(graph.originalId(vertex), Double.toString(scores[vertex]));
             }
         }
     }
 
-    private static int[] orderByOriginalId(Graph graph) {
+    private static int[] orderByRank(Graph graph, double[] scores) {
         int n = graph.vertexCount();
         Integer[] order = new Integer[n];
         for (int i = 0; i < n; i++) {
             order[i] = i;
         }
-        Arrays.sort(order, Comparator.comparingInt(graph::originalId));
+        Arrays.sort(order, Comparator.comparingDouble((Integer v) -> scores[v]).reversed()
+                .thenComparingInt(graph::originalId));
         return Arrays.stream(order).mapToInt(Integer::intValue).toArray();
     }
 }

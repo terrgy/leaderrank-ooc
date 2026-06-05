@@ -7,21 +7,22 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.PrimitiveIterator;
 import leaderrank.graph.Graph;
-import leaderrank.graph.VertexSources;
+import leaderrank.graph.inmemory.InMemoryGraph;
 import org.junit.jupiter.api.Test;
 
-class EdgeListReaderTest {
+class CsvEdgeSourceTest {
 
     private Graph read(String csv) throws IOException {
-        return new EdgeListReader().read(new StringReader(csv));
+        return InMemoryGraph.build(new CsvEdgeSource(() -> new StringReader(csv)));
     }
 
     private static List<Integer> inNeighbors(Graph graph, int destinationDenseId) {
         List<Integer> result = new ArrayList<>();
-        VertexSources vertexSources = graph.getVertexSources(destinationDenseId);
-        while (!vertexSources.isEnd()) {
-            result.add(vertexSources.getNextSource());
+        PrimitiveIterator.OfInt sources = graph.sourcesOf(destinationDenseId);
+        while (sources.hasNext()) {
+            result.add(sources.nextInt());
         }
         return result;
     }

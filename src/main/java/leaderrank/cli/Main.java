@@ -13,7 +13,11 @@ import leaderrank.core.LeaderRankResult;
 import leaderrank.core.RankingEngine;
 import leaderrank.gen.RmatGenerator;
 import leaderrank.graph.Graph;
-import leaderrank.io.EdgeListReader;
+import leaderrank.graph.GraphFactory;
+import leaderrank.graph.edge.EdgeSource;
+import leaderrank.graph.inmemory.InMemoryGraph;
+import leaderrank.graph.outofcore.OutOfCoreGraph;
+import leaderrank.io.CsvEdgeSource;
 import leaderrank.io.RankCsvWriter;
 
 public final class Main {
@@ -31,22 +35,27 @@ public final class Main {
     private static void rank(String[] args) throws IOException {
         List<String> positionals = new ArrayList<>();
         boolean dense = false;
+        boolean inMemory = false;
         for (String arg : args) {
             if (arg.equals("--dense")) {
                 dense = true;
+            } else if (arg.equals("--in-memory")) {
+                inMemory = true;
             } else {
                 positionals.add(arg);
             }
         }
         if (positionals.isEmpty()) {
-            System.err.println("Usage: leaderrank <edges.csv> [output.csv] [--dense]");
+            System.err.println("Usage: leaderrank <edges.csv> [output.csv] [--dense] [--in-memory]");
             System.err.println("       leaderrank verify <edges.csv>");
             System.err.println("       leaderrank generate <out.csv> --scale=N --edges=M [--seed=S]");
             System.exit(2);
             return;
         }
 
-        Graph graph = new EdgeListReader().read(Path.of(positionals.get(0)));
+        EdgeSource source = new CsvEdgeSource(Path.of(positionals.getFirst()));
+        GraphFactory factory = inMemory ? InMemoryGraph::build : OutOfCoreGraph::build;
+        Graph graph = factory.create(source);
         RankingEngine engine = dense ? new DenseLeaderRank() : new LeaderRank();
         LeaderRankResult result = engine.run(graph);
 
@@ -67,7 +76,8 @@ public final class Main {
             return;
         }
 
-        Graph graph = new EdgeListReader().read(Path.of(args[1]));
+        EdgeSource source = new CsvEdgeSource(Path.of(args[1]));
+        Graph graph = OutOfCoreGraph.build(source);
         LeaderRankResult fast = new LeaderRank().run(graph);
         LeaderRankResult truth = new DenseLeaderRank().run(graph);
 

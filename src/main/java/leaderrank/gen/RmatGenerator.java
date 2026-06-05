@@ -6,12 +6,15 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Random;
+
 import leaderrank.graph.Graph;
-import leaderrank.graph.InMemoryGraph;
+import leaderrank.graph.GraphFactory;
+import leaderrank.graph.edge.EdgeCursor;
+import leaderrank.graph.edge.EdgeSource;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 
-public final class RmatGenerator {
+public final class RmatGenerator implements EdgeSource {
 
     public static final double DEFAULT_A = 0.57;
     public static final double DEFAULT_B = 0.19;
@@ -28,7 +31,6 @@ public final class RmatGenerator {
     private final double a;
     private final double b;
     private final double c;
-    private final double d;
     private final long seed;
 
     public RmatGenerator(int scale, long edges, long seed) {
@@ -51,7 +53,6 @@ public final class RmatGenerator {
         this.a = a;
         this.b = b;
         this.c = c;
-        this.d = d;
         this.seed = seed;
     }
 
@@ -63,37 +64,52 @@ public final class RmatGenerator {
         return edges;
     }
 
+    @Override
+    public EdgeCursor open() {
+        return new EdgeCursor() {
+            private final Random random = new Random(seed);
+            private long produced = 0;
+            private int from;
+            private int to;
+
+            @Override
+            public boolean next() {
+                if (produced >= edges) {
+                    return false;
+                }
+                long edge = nextEdge(random);
+                from = (int) (edge >>> 32);
+                to = (int) edge;
+                produced++;
+                return true;
+            }
+
+            @Override
+            public int from() {
+                return from;
+            }
+
+            @Override
+            public int to() {
+                return to;
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+    }
+
+    public Graph toGraph(GraphFactory factory) throws IOException {
+        return factory.create(this);
+    }
+
     public void generate(EdgeConsumer consumer) throws IOException {
         Random random = new Random(seed);
         for (long i = 0; i < edges; i++) {
             long edge = nextEdge(random);
             consumer.accept((int) (edge >>> 32), (int) edge);
         }
-    }
-
-    public Graph toGraph() {
-        if (edges > Integer.MAX_VALUE) {
-            throw new IllegalStateException("edge count too large for an in-memory graph");
-        }
-        int n = vertexCount();
-        int m = (int) edges;
-        int[] sources = new int[m];
-        int[] targets = new int[m];
-        int[] outDegrees = new int[n];
-        Random random = new Random(seed);
-        for (int i = 0; i < m; i++) {
-            long edge = nextEdge(random);
-            int from = (int) (edge >>> 32);
-            int to = (int) edge;
-            sources[i] = from;
-            targets[i] = to;
-            outDegrees[from]++;
-        }
-        int[] originalIds = new int[n];
-        for (int v = 0; v < n; v++) {
-            originalIds[v] = v;
-        }
-        return new InMemoryGraph(n, sources, targets, outDegrees, originalIds);
     }
 
     public void writeCsv(Path path) throws IOException {

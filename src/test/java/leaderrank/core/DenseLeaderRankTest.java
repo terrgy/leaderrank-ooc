@@ -6,14 +6,14 @@ import static org.assertj.core.api.Assertions.within;
 import java.io.IOException;
 import java.io.StringReader;
 import leaderrank.graph.Graph;
-import leaderrank.graph.InMemoryGraph;
-import leaderrank.io.EdgeListReader;
+import leaderrank.graph.inmemory.InMemoryGraph;
+import leaderrank.io.CsvEdgeSource;
 import org.junit.jupiter.api.Test;
 
 class DenseLeaderRankTest {
 
     private Graph read(String csv) throws IOException {
-        return new EdgeListReader().read(new StringReader(csv));
+        return InMemoryGraph.build(new CsvEdgeSource(() -> new StringReader(csv)));
     }
 
     private static int argmax(double[] values) {
@@ -57,8 +57,8 @@ class DenseLeaderRankTest {
     }
 
     @Test
-    void handlesEmptyGraph() {
-        Graph empty = new InMemoryGraph(0, new int[0], new int[0], new int[0], new int[0]);
+    void handlesEmptyGraph() throws IOException {
+        Graph empty = read("from,to\n");
         LeaderRankResult result = new DenseLeaderRank().run(empty);
         assertThat(result.scores()).isEmpty();
         assertThat(result.converged()).isTrue();

@@ -1,12 +1,14 @@
 package leaderrank.graph;
 
+import java.util.PrimitiveIterator;
+
 public interface Graph {
 
     int vertexCount();
 
     int edgeCount();
 
-    VertexSources getVertexSources(int destinationDenseId);
+    PrimitiveIterator.OfInt sourcesOf(int destinationDenseId);
 
     int outDegree(int denseId);
 

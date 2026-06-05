@@ -2,7 +2,6 @@ package leaderrank.core;
 
 import java.util.Arrays;
 import leaderrank.graph.Graph;
-import leaderrank.graph.VertexSources;
 
 public final class LeaderRank implements RankingEngine {
 
@@ -58,9 +57,9 @@ public final class LeaderRank implements RankingEngine {
 
             for (int i = 0; i < n; i++) {
                 double sum = base;
-                VertexSources vertexSources = graph.getVertexSources(i);
-                while (!vertexSources.isEnd()) {
-                    sum += contrib[vertexSources.getNextSource()];
+                var iterator = graph.sourcesOf(i);
+                while (iterator.hasNext()) {
+                    sum += contrib[iterator.nextInt()];
                 }
                 next[i] = sum;
             }

@@ -1,7 +1,6 @@
 package leaderrank.core;
 
 import leaderrank.graph.Graph;
-import leaderrank.graph.VertexSources;
 
 public final class DenseLeaderRank implements RankingEngine {
 
@@ -88,9 +87,9 @@ public final class DenseLeaderRank implements RankingEngine {
             transition[ground][v] += 1.0 / (graph.outDegree(v) + 1);
         }
         for (int i = 0; i < n; i++) {
-            VertexSources vertexSources = graph.getVertexSources(i);
-            while (!vertexSources.isEnd()) {
-                int from = vertexSources.getNextSource();
+            var iterator = graph.sourcesOf(i);
+            while (iterator.hasNext()) {
+                int from = iterator.nextInt();
                 transition[i][from] += 1.0 / (graph.outDegree(from) + 1);
             }
         }
