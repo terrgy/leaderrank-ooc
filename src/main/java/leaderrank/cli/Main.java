@@ -78,9 +78,9 @@ public final class Main {
         if (inMemory) {
             graph = InMemoryGraph.build(source);
         } else if (budget > 0) {
-            graph = OutOfCoreGraph.build(source, budget);
+            graph = OutOfCoreGraph.build(source, budget, threads);
         } else {
-            graph = OutOfCoreGraph.build(source);
+            graph = OutOfCoreGraph.build(source, threads);
         }
         double buildMillis = millisSince(buildStart);
 

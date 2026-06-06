@@ -15,6 +15,7 @@ import leaderrank.graph.edge.EdgeSource;
 import leaderrank.graph.inmemory.InMemoryGraph;
 import leaderrank.io.CsvEdgeSource;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class BinFilesTest {
 
@@ -91,14 +92,15 @@ class BinFilesTest {
     }
 
     @Test
-    void waveDistributionMatchesSinglePass() throws IOException {
+    void waveDistributionMatchesSinglePass(@TempDir Path dir) throws IOException {
         EdgeSource source = csv("from,to\n1,2\n1,3\n2,3\n3,1\n3,4\n4,3\n5,3\n6,3\n");
-        Pass1Result pass1 = OutOfCoreGraphPreprocessor.pass1(source);
+        Path denseEdges = dir.resolve("edges.bin");
+        Pass1Result pass1 = OutOfCoreGraphPreprocessor.buildIdMapAndSpill(source, denseEdges);
         List<Bin> plan = BinPlanner.plan(pass1.sourcesPtr(), 1);
         try (BinFiles onePass = BinFiles.create(plan);
                 BinFiles waved = BinFiles.create(plan)) {
-            onePass.distribute(source, pass1.mapper());
-            waved.distribute(source, pass1.mapper(), 1L);
+            onePass.distribute(denseEdges);
+            waved.distribute(denseEdges, 1L);
             assertThat(plan.size()).isGreaterThan(1);
             for (int b = 0; b < plan.size(); b++) {
                 assertThat(Files.readAllBytes(waved.pathOf(b)))

@@ -5,6 +5,8 @@ import leaderrank.graph.ShardPlanner;
 import leaderrank.graph.edge.EdgeSource;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 public final class EdgeBinning {
@@ -21,14 +23,20 @@ public final class EdgeBinning {
     }
 
     public static BinFiles bin(EdgeSource source, long maxEdgesPerBin) throws IOException {
-        Pass1Result pass1 = OutOfCoreGraphPreprocessor.pass1(source);
-        BinFiles files = BinFiles.create(BinPlanner.plan(pass1.sourcesPtr(), maxEdgesPerBin));
+        Path denseEdges = Files.createTempFile("leaderrank-edges-", ".bin");
+        denseEdges.toFile().deleteOnExit();
         try {
-            files.distribute(source, pass1.mapper());
-        } catch (IOException | RuntimeException e) {
-            files.close();
-            throw e;
+            Pass1Result pass1 = OutOfCoreGraphPreprocessor.buildIdMapAndSpill(source, denseEdges);
+            BinFiles files = BinFiles.create(BinPlanner.plan(pass1.sourcesPtr(), maxEdgesPerBin));
+            try {
+                files.distribute(denseEdges);
+            } catch (IOException | RuntimeException e) {
+                files.close();
+                throw e;
+            }
+            return files;
+        } finally {
+            Files.deleteIfExists(denseEdges);
         }
-        return files;
     }
 }

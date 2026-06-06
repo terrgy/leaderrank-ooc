@@ -29,15 +29,29 @@ public final class OutOfCoreGraph implements Graph {
     }
 
     public static Graph build(EdgeSource source) throws IOException {
-        return build(source, MemoryBudget.discover());
+        return build(source, Runtime.getRuntime().availableProcessors());
+    }
+
+    public static Graph build(EdgeSource source, int parallelism) throws IOException {
+        return build(source, MemoryBudget.discover(), parallelism);
     }
 
     public static Graph build(EdgeSource source, MemoryBudget budget) throws IOException {
-        return new OutOfCoreGraph(OutOfCoreGraphPreprocessor.process(source, sourcesFile(), budget));
+        return build(source, budget, Runtime.getRuntime().availableProcessors());
+    }
+
+    public static Graph build(EdgeSource source, MemoryBudget budget, int parallelism) throws IOException {
+        return new OutOfCoreGraph(
+                OutOfCoreGraphPreprocessor.process(source, sourcesFile(), budget, parallelism));
     }
 
     public static Graph build(EdgeSource source, long maxEdgesPerBin) throws IOException {
-        return new OutOfCoreGraph(OutOfCoreGraphPreprocessor.process(source, sourcesFile(), maxEdgesPerBin));
+        return build(source, maxEdgesPerBin, Runtime.getRuntime().availableProcessors());
+    }
+
+    public static Graph build(EdgeSource source, long maxEdgesPerBin, int parallelism) throws IOException {
+        return new OutOfCoreGraph(
+                OutOfCoreGraphPreprocessor.process(source, sourcesFile(), maxEdgesPerBin, parallelism));
     }
 
     private static Path sourcesFile() throws IOException {

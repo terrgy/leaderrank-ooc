@@ -1,9 +1,5 @@
 package leaderrank.graph.outofcore;
 
-import leaderrank.graph.edge.EdgeCursor;
-import leaderrank.graph.edge.EdgeSource;
-import leaderrank.utils.IdMapper;
-
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -54,6 +50,10 @@ public final class BinFiles implements Closeable {
         return directory.resolve("bin-" + binIndex);
     }
 
+    void deleteBin(int binIndex) throws IOException {
+        Files.deleteIfExists(pathOf(binIndex));
+    }
+
     Path directory() {
         return directory;
     }
@@ -85,16 +85,16 @@ public final class BinFiles implements Closeable {
         return index >= 0 ? index : -index - 2;
     }
 
-    void distribute(EdgeSource source, IdMapper mapper) throws IOException {
-        distribute(source, mapper, Long.MAX_VALUE);
+    void distribute(Path denseEdges) throws IOException {
+        distribute(denseEdges, Long.MAX_VALUE);
     }
 
-    void distribute(EdgeSource source, IdMapper mapper, long availableBytes) throws IOException {
+    void distribute(Path denseEdges, long availableBytes) throws IOException {
         int count = bins.size();
         int maxOpenBins = maxOpenBins(availableBytes, count);
         for (int windowStart = 0; windowStart < count; windowStart += maxOpenBins) {
             int windowEnd = Math.min(count, windowStart + maxOpenBins);
-            distributeWindow(source, mapper, windowStart, windowEnd);
+            distributeWindow(denseEdges, windowStart, windowEnd);
         }
     }
 
@@ -109,8 +109,7 @@ public final class BinFiles implements Closeable {
         return (int) Math.min(open, count);
     }
 
-    private void distributeWindow(EdgeSource source, IdMapper mapper, int windowStart, int windowEnd)
-            throws IOException {
+    private void distributeWindow(Path denseEdges, int windowStart, int windowEnd) throws IOException {
         int width = windowEnd - windowStart;
         FileChannel[] channels = new FileChannel[width];
         ByteBuffer[] buffers = new ByteBuffer[width];
@@ -122,15 +121,23 @@ public final class BinFiles implements Closeable {
                         StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
                 buffers[i] = ByteBuffer.allocate(WRITE_BUFFER_BYTES).order(ByteOrder.LITTLE_ENDIAN);
             }
-            try (EdgeCursor cursor = source.open()) {
-                while (cursor.next()) {
-                    int destination = mapper.denseOf(cursor.to());
+            try (FileChannel in = FileChannel.open(denseEdges, StandardOpenOption.READ)) {
+                ByteBuffer read = ByteBuffer.allocate(READ_BUFFER_BYTES).order(ByteOrder.LITTLE_ENDIAN);
+                read.position(0).limit(0);
+                while (true) {
+                    if (read.remaining() < PAIR_BYTES) {
+                        refill(in, read, PAIR_BYTES);
+                        if (read.remaining() < PAIR_BYTES) {
+                            break;
+                        }
+                    }
+                    int sourceVertex = read.getInt();
+                    int destination = read.getInt();
                     int bin = binOf(destination);
                     if (bin < windowStart || bin >= windowEnd) {
                         continue;
                     }
                     int slot = bin - windowStart;
-                    int sourceVertex = mapper.denseOf(cursor.from());
                     ByteBuffer buffer = buffers[slot];
                     if (oversized[bin]) {
                         if (buffer.remaining() < Integer.BYTES) {
@@ -148,6 +155,7 @@ public final class BinFiles implements Closeable {
             }
             for (int i = 0; i < width; i++) {
                 drain(channels[i], buffers[i]);
+                channels[i].force(false);
             }
         } finally {
             for (FileChannel channel : channels) {
