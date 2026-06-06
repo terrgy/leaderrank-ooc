@@ -59,9 +59,9 @@ class MemoryCapEnforcementTest {
                 "-p", "MemoryMax=" + CAP, "-p", "MemorySwapMax=0",
                 javaBinary(), HEAP, "-XX:+UseSerialGC",
                 "-cp", System.getProperty("java.class.path"),
-                "leaderrank.cli.Main", graph.toString(), "/dev/null", "--threads=2"));
+                "leaderrank.cli.Main", "rank", graph.toString(), "/dev/null", "--threads=2"));
         if (inMemory) {
-            command.add("--in-memory");
+            command.add("--graph=in-memory");
         }
         return execute(command);
     }

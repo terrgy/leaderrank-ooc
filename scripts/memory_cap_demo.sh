@@ -50,7 +50,7 @@ run_capped() {
     systemd-run --user --scope --quiet \
         -p MemoryMax="$CAP" -p MemorySwapMax=0 \
         env JAVA_OPTS="$heap" \
-        "$LAUNCHER" "$GRAPH" /dev/null --threads="$THREADS" "$@"
+        "$LAUNCHER" rank "$GRAPH" /dev/null --threads="$THREADS" "$@"
 }
 
 ensure_dist
@@ -82,7 +82,7 @@ say ""
 say "[B] Наивный in-memory движок, та же куча $XMX, тот же предел $CAP"
 say "    Ожидание: нехватка кучи Java (OutOfMemoryError) — представление O(E) не помещается."
 rule
-out_b=$(run_capped "$XMX" --in-memory 2>&1); rc_b=$?
+out_b=$(run_capped "$XMX" --graph=in-memory 2>&1); rc_b=$?
 printf '%s\n' "$out_b" | grep -iE 'OutOfMemoryError|Exception in' | head -1
 say "    -> код выхода: $rc_b"
 
@@ -91,7 +91,7 @@ say "[C] Наивный in-memory движок, щедрая куча $XMX_GENER
 say "    Ожидание: процесс убит ядром (cgroup OOM, сигнал KILL, код 137)."
 say "    Смысл: даже когда JVM разрешено расти, ядро не даёт превысить $CAP."
 rule
-out_c=$(run_capped "$XMX_GENEROUS" --in-memory 2>&1); rc_c=$?
+out_c=$(run_capped "$XMX_GENEROUS" --graph=in-memory 2>&1); rc_c=$?
 say "    -> код выхода: $rc_c"
 
 say ""

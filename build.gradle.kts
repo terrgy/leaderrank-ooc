@@ -26,6 +26,7 @@ application {
 dependencies {
     implementation("org.apache.commons:commons-csv:1.11.0")
     implementation("it.unimi.dsi:fastutil-core:8.5.18")
+    implementation("info.picocli:picocli:4.7.7")
 
     testImplementation(platform("org.junit:junit-bom:5.11.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
