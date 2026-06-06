@@ -98,6 +98,14 @@ public final class BinFiles implements Closeable {
         }
     }
 
+    public static int distributionWaves(long availableBytes, int binCount) {
+        if (binCount <= 0) {
+            return 0;
+        }
+        int open = maxOpenBins(availableBytes, binCount);
+        return (binCount + open - 1) / open;
+    }
+
     private static int maxOpenBins(long availableBytes, int count) {
         if (availableBytes >= (long) count * WRITE_BUFFER_BYTES) {
             return Math.max(1, count);

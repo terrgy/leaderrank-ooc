@@ -34,6 +34,10 @@ final class EngineOptions {
                     + "(default: all CPU cores)")
     private int threads = Runtime.getRuntime().availableProcessors();
 
+    @Option(names = "--max-iterations", paramLabel = "N",
+            description = "power-method iteration cap (default: ${DEFAULT-VALUE})")
+    private int maxIterations = ParallelLeaderRank.DEFAULT_MAX_ITERATIONS;
+
     void validate(CommandSpec spec) {
         boolean explicitThreads = spec.commandLine().getParseResult().hasMatchedOption("--threads");
         if (explicitThreads && engine != EngineChoice.PARALLEL && graph != GraphChoice.OUT_OF_CORE) {
@@ -42,6 +46,9 @@ final class EngineOptions {
         }
         if (threads < 1) {
             throw new ParameterException(spec.commandLine(), "--threads must be at least 1");
+        }
+        if (maxIterations < 1) {
+            throw new ParameterException(spec.commandLine(), "--max-iterations must be at least 1");
         }
     }
 
@@ -66,9 +73,13 @@ final class EngineOptions {
 
     RankingEngine engine() {
         return switch (engine) {
-            case DENSE -> new DenseLeaderRank();
-            case COMMON -> new LeaderRank();
-            case PARALLEL -> new ParallelLeaderRank(threads);
+            case DENSE -> new DenseLeaderRank(DenseLeaderRank.DEFAULT_TOLERANCE, maxIterations);
+            case COMMON -> new LeaderRank(LeaderRank.DEFAULT_TOLERANCE, maxIterations);
+            case PARALLEL -> new ParallelLeaderRank(threads, ParallelLeaderRank.DEFAULT_TOLERANCE, maxIterations);
         };
+    }
+
+    RankingEngine truthEngine() {
+        return new DenseLeaderRank(DenseLeaderRank.DEFAULT_TOLERANCE, maxIterations);
     }
 }

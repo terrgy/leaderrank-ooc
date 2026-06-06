@@ -63,7 +63,7 @@ class CliTest {
         Result result = run("rank", "--help");
         assertThat(result.code).isZero();
         assertThat(result.out)
-                .contains("--engine", "--graph", "--threads", "--print-top")
+                .contains("--engine", "--graph", "--threads", "--print-top", "--max-iterations")
                 .contains("dense", "common", "parallel")
                 .contains("in-memory", "out-of-core");
     }
@@ -109,6 +109,29 @@ class CliTest {
         assertThat(result.code).isZero();
         assertThat(result.out).contains("wrote ranks to").doesNotContain("ranks:");
         assertThat(Files.readString(out)).startsWith("vertex,rank");
+    }
+
+    @Test
+    void maxIterationsCapsReportedIterations() {
+        Result result = run("rank", graph.toString(), "--engine=common", "--graph=in-memory",
+                "--max-iterations=2", "--print-top=1");
+        assertThat(result.code).isZero();
+        assertThat(result.out).contains("iterations: 2 (max reached)");
+    }
+
+    @Test
+    void maxIterationsRejectsZero() {
+        Result result = run("rank", graph.toString(), "--engine=common", "--graph=in-memory",
+                "--max-iterations=0");
+        assertThat(result.code).isNotZero();
+        assertThat(result.err).contains("--max-iterations");
+    }
+
+    @Test
+    void binStatisticsPrintedForOutOfCore() {
+        Result result = run("rank", graph.toString(), "--graph=out-of-core", "--print-top=1");
+        assertThat(result.code).isZero();
+        assertThat(result.out).contains("bins:").contains("distribution pass");
     }
 
     @Test

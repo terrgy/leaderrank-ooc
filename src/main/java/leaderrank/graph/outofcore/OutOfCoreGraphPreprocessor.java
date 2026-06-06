@@ -36,7 +36,7 @@ final class OutOfCoreGraphPreprocessor {
             }
         }
 
-        return new Pass1Result(mapper, prefixSums(inDegrees), outDegrees.toIntArray(), edgeCount);
+        return new Pass1Result(mapper.originalIds(), prefixSums(inDegrees), outDegrees.toIntArray(), edgeCount);
     }
 
     static Pass1Result buildIdMapAndSpill(EdgeSource source, Path denseEdges) throws IOException {
@@ -71,7 +71,7 @@ final class OutOfCoreGraphPreprocessor {
             out.force(false);
         }
 
-        return new Pass1Result(mapper, prefixSums(inDegrees), outDegrees.toIntArray(), edgeCount);
+        return new Pass1Result(mapper.originalIds(), prefixSums(inDegrees), outDegrees.toIntArray(), edgeCount);
     }
 
     private static Pass1Result mapAndSpill(EdgeSource source, Path denseEdges, int parallelism) throws IOException {
@@ -147,6 +147,8 @@ final class OutOfCoreGraphPreprocessor {
     private static OutOfCorePreprocessingData assemble(Path denseEdges, Pass1Result pass1, Path sourcesPath,
             int maxEdgesPerBin, long availableBytes) throws IOException {
         List<Bin> bins = BinPlanner.plan(pass1.sourcesPtr(), maxEdgesPerBin);
+        int binCount = bins.size();
+        int distributionWaves = BinFiles.distributionWaves(availableBytes, binCount);
 
         try (BinFiles binFiles = BinFiles.create(bins)) {
             binFiles.distribute(denseEdges, availableBytes);
@@ -157,9 +159,12 @@ final class OutOfCoreGraphPreprocessor {
         return new OutOfCorePreprocessingData(
                 pass1.sourcesPtr(),
                 pass1.outDegrees(),
-                pass1.mapper().originalIds(),
+                pass1.originalIds(),
                 pass1.edgeCount(),
-                sourcesPath
+                sourcesPath,
+                binCount,
+                maxEdgesPerBin,
+                distributionWaves
         );
     }
 

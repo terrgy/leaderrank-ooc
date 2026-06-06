@@ -60,6 +60,18 @@ public final class OutOfCoreGraph implements Graph {
         return sourcesFile;
     }
 
+    public int binCount() {
+        return data.binCount();
+    }
+
+    public int maxEdgesPerBin() {
+        return data.maxEdgesPerBin();
+    }
+
+    public int distributionWaves() {
+        return data.distributionWaves();
+    }
+
     @Override
     public int vertexCount() {
         return data.outDegrees().length;

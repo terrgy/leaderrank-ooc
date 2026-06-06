@@ -3,7 +3,6 @@ package leaderrank.cli;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.concurrent.Callable;
-import leaderrank.core.DenseLeaderRank;
 import leaderrank.core.LeaderRankResult;
 import leaderrank.core.RankingEngine;
 import leaderrank.graph.Graph;
@@ -38,7 +37,7 @@ final class VerifyCommand implements Callable<Integer> {
 
         RankingEngine fastEngine = engineOptions.engine();
         LeaderRankResult fast = fastEngine.run(graph);
-        LeaderRankResult truth = new DenseLeaderRank().run(graph);
+        LeaderRankResult truth = engineOptions.truthEngine().run(graph);
 
         double[] a = fast.scores();
         double[] b = truth.scores();

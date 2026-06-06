@@ -9,6 +9,7 @@ import leaderrank.core.LeaderRankResult;
 import leaderrank.core.RankingEngine;
 import leaderrank.graph.Graph;
 import leaderrank.graph.edge.EdgeSource;
+import leaderrank.graph.outofcore.OutOfCoreGraph;
 import leaderrank.io.CsvEdgeSource;
 import leaderrank.io.RankCsvWriter;
 import leaderrank.utils.Rss;
@@ -98,6 +99,10 @@ final class RankCommand implements Callable<Integer> {
     private static void printStats(Graph graph, LeaderRankResult result) {
         System.out.println("vertices: " + graph.vertexCount());
         System.out.println("edges: " + graph.edgeCount());
+        if (graph instanceof OutOfCoreGraph ooc) {
+            System.out.println("bins: " + ooc.binCount() + " (<= " + ooc.maxEdgesPerBin()
+                    + " edges/bin, " + ooc.distributionWaves() + " distribution pass(es))");
+        }
         System.out.println("iterations: " + result.iterations()
                 + (result.converged() ? " (converged)" : " (max reached)"));
         double mib = 1024.0 * 1024.0;

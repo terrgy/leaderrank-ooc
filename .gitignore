@@ -9,3 +9,6 @@ build/
 
 # OS
 .DS_Store
+
+# Benchmark data (downloaded SNAP graphs, generated graphs)
+bench/
