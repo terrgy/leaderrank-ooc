@@ -16,7 +16,7 @@ final class CsvEdgeCursor implements EdgeCursor {
 
     CsvEdgeCursor(CSVParser parser) {
         this.parser = parser;
-        iterator = parser.iterator();
+        this.iterator = parser.iterator();
     }
 
     @Override
@@ -25,17 +25,9 @@ final class CsvEdgeCursor implements EdgeCursor {
             return false;
         }
         CSVRecord record = iterator.next();
-        if (record.size() < 2) {
-            throw new IOException(
-                    "row " + record.getRecordNumber() + ": expected 'from,to', got: " + record);
-        }
-        try {
-            from = Integer.parseInt(record.get(0));
-            to = Integer.parseInt(record.get(1));
-        } catch (NumberFormatException e) {
-            throw new IOException(
-                    "row " + record.getRecordNumber() + ": vertex ids must be int32, got: " + record, e);
-        }
+        requireTwoColumns(record);
+        from = parseVertex(record, 0);
+        to = parseVertex(record, 1);
         return true;
     }
 
@@ -52,5 +44,23 @@ final class CsvEdgeCursor implements EdgeCursor {
     @Override
     public void close() throws IOException {
         parser.close();
+    }
+
+    private static void requireTwoColumns(CSVRecord record) throws IOException {
+        if (record.size() < 2) {
+            throw new IOException(rowError(record, "expected 'from,to'"));
+        }
+    }
+
+    private static int parseVertex(CSVRecord record, int column) throws IOException {
+        try {
+            return Integer.parseInt(record.get(column));
+        } catch (NumberFormatException e) {
+            throw new IOException(rowError(record, "vertex ids must be int32"), e);
+        }
+    }
+
+    private static String rowError(CSVRecord record, String detail) {
+        return "row " + record.getRecordNumber() + ": " + detail + ", got: " + record;
     }
 }

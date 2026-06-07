@@ -49,19 +49,8 @@ public final class DenseLeaderRank implements RankingEngine {
         while (iterations < maxIterations) {
             iterations++;
 
-            for (int i = 0; i < size; i++) {
-                double[] row = transition[i];
-                double sum = 0.0;
-                for (int j = 0; j < size; j++) {
-                    sum += row[j] * scores[j];
-                }
-                next[i] = sum;
-            }
-
-            double delta = 0.0;
-            for (int i = 0; i < size; i++) {
-                delta += Math.abs(next[i] - scores[i]);
-            }
+            multiply(transition, scores, next);
+            double delta = l1Distance(scores, next);
 
             double[] swap = scores;
             scores = next;
@@ -100,5 +89,24 @@ public final class DenseLeaderRank implements RankingEngine {
             transition[i][ground] = groundWeight;
         }
         return transition;
+    }
+
+    private static void multiply(double[][] transition, double[] vector, double[] result) {
+        for (int i = 0; i < result.length; i++) {
+            double[] row = transition[i];
+            double sum = 0.0;
+            for (int j = 0; j < vector.length; j++) {
+                sum += row[j] * vector[j];
+            }
+            result[i] = sum;
+        }
+    }
+
+    private static double l1Distance(double[] previous, double[] current) {
+        double delta = 0.0;
+        for (int i = 0; i < previous.length; i++) {
+            delta += Math.abs(current[i] - previous[i]);
+        }
+        return delta;
     }
 }

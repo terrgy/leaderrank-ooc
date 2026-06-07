@@ -36,7 +36,12 @@ public final class CsvEdgeSource implements EdgeSource {
     @Override
     public EdgeCursor open() throws IOException {
         Reader reader = readerFactory.open();
-        return new CsvEdgeCursor(CSVParser.parse(reader, FORMAT));
+        try {
+            return new CsvEdgeCursor(CSVParser.parse(reader, FORMAT));
+        } catch (IOException | RuntimeException e) {
+            reader.close();
+            throw e;
+        }
     }
 
     @Override
