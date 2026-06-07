@@ -1,7 +1,7 @@
 package leaderrank.graph.outofcore;
 
-import leaderrank.graph.outofcore.build.MemoryBudget;
-import leaderrank.graph.outofcore.build.Preprocessor;
+import leaderrank.graph.outofcore.preprocessing.MemoryBudget;
+import leaderrank.graph.outofcore.preprocessing.Preprocessor;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;

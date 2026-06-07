@@ -1,43 +1,21 @@
-package leaderrank.graph.outofcore.build;
+package leaderrank.graph.outofcore.preprocessing;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import leaderrank.graph.IdMapper;
 import leaderrank.graph.EdgeCursor;
 import leaderrank.graph.EdgeSource;
+import leaderrank.graph.outofcore.io.IntWriter;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.List;
 
 public final class Preprocessor {
 
     private static final int EDGE_BUFFER_BYTES = 1 << 16;
-
-    static Pass1Result pass1(EdgeSource source) throws IOException {
-        IdMapper mapper = new IdMapper();
-        IntArrayList inDegrees = new IntArrayList();
-        IntArrayList outDegrees = new IntArrayList();
-        long edgeCount = 0;
-
-        try (EdgeCursor cursor = source.open()) {
-            while (cursor.next()) {
-                int denseFrom = mapper.mapOrAssign(cursor.from());
-                int denseTo = mapper.mapOrAssign(cursor.to());
-                growTo(inDegrees, outDegrees, mapper.size());
-                inDegrees.set(denseTo, inDegrees.getInt(denseTo) + 1);
-                outDegrees.set(denseFrom, outDegrees.getInt(denseFrom) + 1);
-                edgeCount++;
-            }
-        }
-
-        return new Pass1Result(mapper.originalIds(), prefixSums(inDegrees), outDegrees.toIntArray(), edgeCount);
-    }
+    private static final int SOURCES_BUFFER_BYTES = 1 << 20;
 
     static Pass1Result buildIdMapAndSpill(EdgeSource source, Path denseEdges) throws IOException {
         try (EdgeCursor cursor = source.open()) {
@@ -51,9 +29,7 @@ public final class Preprocessor {
         IntArrayList outDegrees = new IntArrayList();
         long edgeCount = 0;
 
-        try (FileChannel out = FileChannel.open(denseEdges,
-                StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
-            ByteBuffer buffer = ByteBuffer.allocate(EDGE_BUFFER_BYTES).order(ByteOrder.LITTLE_ENDIAN);
+        try (IntWriter edges = IntWriter.create(denseEdges, EDGE_BUFFER_BYTES)) {
             while (cursor.next()) {
                 int denseFrom = mapper.mapOrAssign(cursor.from());
                 int denseTo = mapper.mapOrAssign(cursor.to());
@@ -61,14 +37,8 @@ public final class Preprocessor {
                 inDegrees.set(denseTo, inDegrees.getInt(denseTo) + 1);
                 outDegrees.set(denseFrom, outDegrees.getInt(denseFrom) + 1);
                 edgeCount++;
-                if (buffer.remaining() < 2 * Integer.BYTES) {
-                    drain(out, buffer);
-                }
-                buffer.putInt(denseFrom);
-                buffer.putInt(denseTo);
+                edges.write(denseFrom, denseTo);
             }
-            drain(out, buffer);
-            out.force(false);
         }
 
         return new Pass1Result(mapper.originalIds(), prefixSums(inDegrees), outDegrees.toIntArray(), edgeCount);
@@ -100,9 +70,8 @@ public final class Preprocessor {
         }
     }
 
-    public static PreprocessingData process(EdgeSource source, Path sourcesPath, long maxEdgesPerBin)
-            throws IOException {
-        return process(source, sourcesPath, maxEdgesPerBin, defaultParallelism());
+    public static void process(EdgeSource source, Path sourcesPath, long maxEdgesPerBin) throws IOException {
+        process(source, sourcesPath, maxEdgesPerBin, defaultParallelism());
     }
 
     public static PreprocessingData process(EdgeSource source, Path sourcesPath, long maxEdgesPerBin,
@@ -116,9 +85,8 @@ public final class Preprocessor {
         }
     }
 
-    public static PreprocessingData process(EdgeSource source, Path sourcesPath, MemoryBudget budget)
-            throws IOException {
-        return process(source, sourcesPath, budget, defaultParallelism());
+    public static void process(EdgeSource source, Path sourcesPath, MemoryBudget budget) throws IOException {
+        process(source, sourcesPath, budget, defaultParallelism());
     }
 
     public static PreprocessingData process(EdgeSource source, Path sourcesPath, MemoryBudget budget,
@@ -169,38 +137,30 @@ public final class Preprocessor {
     }
 
     private static int clampToInt(long value) {
-        return (int) Math.max(1, Math.min(value, Integer.MAX_VALUE));
+        return (int) Math.clamp(value, 1, Integer.MAX_VALUE);
     }
 
     private static void writeSortedSources(BinFiles binFiles, Path sourcesPath, int chunkRecords, long availableBytes)
             throws IOException {
         List<Bin> bins = binFiles.bins();
-        try (FileChannel channel = FileChannel.open(sourcesPath,
-                StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
-            ByteBuffer buffer = ByteBuffer.allocate(1 << 20).order(ByteOrder.LITTLE_ENDIAN);
-            IntSink sink = value -> putSource(channel, buffer, value);
+        try (IntWriter sources = IntWriter.create(sourcesPath, SOURCES_BUFFER_BYTES)) {
             for (int b = 0; b < bins.size(); b++) {
                 if (bins.get(b).oversized()) {
-                    ExternalSort.sort(binFiles.pathOf(b), chunkRecords, binFiles.directory(), sink, availableBytes);
+                    ExternalSort.sort(binFiles.pathOf(b), chunkRecords, binFiles.directory(), sources::write, availableBytes);
                 } else {
-                    long[] packed = binFiles.loadPacked(b);
-                    Arrays.sort(packed);
-                    for (long value : packed) {
-                        sink.accept((int) value);
-                    }
+                    sortNormalBin(binFiles, b, sources);
                 }
                 binFiles.deleteBin(b);
             }
-            drain(channel, buffer);
-            channel.force(false);
         }
     }
 
-    private static void putSource(FileChannel channel, ByteBuffer buffer, int value) throws IOException {
-        if (buffer.remaining() < Integer.BYTES) {
-            drain(channel, buffer);
+    private static void sortNormalBin(BinFiles binFiles, int binIndex, IntWriter sources) throws IOException {
+        long[] packed = binFiles.loadPacked(binIndex);
+        Arrays.sort(packed);
+        for (long value : packed) {
+            sources.write((int) value);
         }
-        buffer.putInt(value);
     }
 
     private static void growTo(IntArrayList inDegrees, IntArrayList outDegrees, int newSize) {
@@ -217,13 +177,5 @@ public final class Preprocessor {
             sums[i + 1] = sums[i] + values.getInt(i);
         }
         return sums;
-    }
-
-    private static void drain(FileChannel channel, ByteBuffer buffer) throws IOException {
-        buffer.flip();
-        while (buffer.hasRemaining()) {
-            channel.write(buffer);
-        }
-        buffer.clear();
     }
 }

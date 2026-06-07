@@ -1,4 +1,4 @@
-package leaderrank.graph.outofcore.build;
+package leaderrank.graph.outofcore.preprocessing;
 
 import java.io.IOException;
 

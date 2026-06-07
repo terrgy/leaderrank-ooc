@@ -1,13 +1,12 @@
-package leaderrank.graph.outofcore.build;
+package leaderrank.graph.outofcore.preprocessing;
+
+import leaderrank.graph.outofcore.io.IntReader;
+import leaderrank.graph.outofcore.io.IntWriter;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
@@ -65,15 +64,10 @@ public final class BinFiles implements Closeable {
 
     public long[] loadPacked(int binIndex) throws IOException {
         long[] packed = new long[(int) recordCount(binIndex)];
-        try (FileChannel channel = FileChannel.open(pathOf(binIndex), StandardOpenOption.READ)) {
-            ByteBuffer buffer = ByteBuffer.allocate(READ_BUFFER_BYTES).order(ByteOrder.LITTLE_ENDIAN);
-            buffer.position(0).limit(0);
+        try (IntReader reader = IntReader.open(pathOf(binIndex), READ_BUFFER_BYTES)) {
             for (int i = 0; i < packed.length; i++) {
-                if (buffer.remaining() < PAIR_BYTES) {
-                    refill(channel, buffer, PAIR_BYTES);
-                }
-                int destination = buffer.getInt();
-                int sourceVertex = buffer.getInt();
+                int destination = reader.next();
+                int sourceVertex = reader.next();
                 packed[i] = ((long) destination << 32) | (sourceVertex & 0xFFFFFFFFL);
             }
         }
@@ -93,8 +87,7 @@ public final class BinFiles implements Closeable {
         int count = bins.size();
         int maxOpenBins = maxOpenBins(availableBytes, count);
         for (int windowStart = 0; windowStart < count; windowStart += maxOpenBins) {
-            int windowEnd = Math.min(count, windowStart + maxOpenBins);
-            distributeWindow(denseEdges, windowStart, windowEnd);
+            distributeWindow(denseEdges, windowStart, Math.min(count, windowStart + maxOpenBins));
         }
     }
 
@@ -118,59 +111,52 @@ public final class BinFiles implements Closeable {
     }
 
     private void distributeWindow(Path denseEdges, int windowStart, int windowEnd) throws IOException {
-        int width = windowEnd - windowStart;
-        FileChannel[] channels = new FileChannel[width];
-        ByteBuffer[] buffers = new ByteBuffer[width];
+        try (OpenBins window = openWindow(windowStart, windowEnd);
+                IntReader edges = IntReader.open(denseEdges, READ_BUFFER_BYTES)) {
+            while (edges.hasNext()) {
+                int sourceVertex = edges.next();
+                int destination = edges.next();
+                int bin = binOf(destination);
+                if (bin < windowStart || bin >= windowEnd) {
+                    continue;
+                }
+                IntWriter writer = window.writer(bin - windowStart);
+                if (oversized[bin]) {
+                    writer.write(sourceVertex);
+                } else {
+                    writer.write(destination, sourceVertex);
+                }
+            }
+        }
+    }
+
+    private OpenBins openWindow(int windowStart, int windowEnd) throws IOException {
+        IntWriter[] writers = new IntWriter[windowEnd - windowStart];
         try {
-            for (int i = 0; i < width; i++) {
-                int bin = windowStart + i;
-                pathOf(bin).toFile().deleteOnExit();
-                channels[i] = FileChannel.open(pathOf(bin),
-                        StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
-                buffers[i] = ByteBuffer.allocate(WRITE_BUFFER_BYTES).order(ByteOrder.LITTLE_ENDIAN);
+            for (int i = 0; i < writers.length; i++) {
+                pathOf(windowStart + i).toFile().deleteOnExit();
+                writers[i] = IntWriter.create(pathOf(windowStart + i), WRITE_BUFFER_BYTES);
             }
-            try (FileChannel in = FileChannel.open(denseEdges, StandardOpenOption.READ)) {
-                ByteBuffer read = ByteBuffer.allocate(READ_BUFFER_BYTES).order(ByteOrder.LITTLE_ENDIAN);
-                read.position(0).limit(0);
-                while (true) {
-                    if (read.remaining() < PAIR_BYTES) {
-                        refill(in, read, PAIR_BYTES);
-                        if (read.remaining() < PAIR_BYTES) {
-                            break;
-                        }
-                    }
-                    int sourceVertex = read.getInt();
-                    int destination = read.getInt();
-                    int bin = binOf(destination);
-                    if (bin < windowStart || bin >= windowEnd) {
-                        continue;
-                    }
-                    int slot = bin - windowStart;
-                    ByteBuffer buffer = buffers[slot];
-                    if (oversized[bin]) {
-                        if (buffer.remaining() < Integer.BYTES) {
-                            drain(channels[slot], buffer);
-                        }
-                        buffer.putInt(sourceVertex);
-                    } else {
-                        if (buffer.remaining() < PAIR_BYTES) {
-                            drain(channels[slot], buffer);
-                        }
-                        buffer.putInt(destination);
-                        buffer.putInt(sourceVertex);
-                    }
+        } catch (IOException e) {
+            closeAll(writers);
+            throw e;
+        }
+        return new OpenBins(writers);
+    }
+
+    private static void closeAll(IntWriter[] writers) throws IOException {
+        IOException failure = null;
+        for (IntWriter writer : writers) {
+            if (writer != null) {
+                try {
+                    writer.close();
+                } catch (IOException e) {
+                    failure = e;
                 }
             }
-            for (int i = 0; i < width; i++) {
-                drain(channels[i], buffers[i]);
-                channels[i].force(false);
-            }
-        } finally {
-            for (FileChannel channel : channels) {
-                if (channel != null) {
-                    channel.close();
-                }
-            }
+        }
+        if (failure != null) {
+            throw failure;
         }
     }
 
@@ -187,21 +173,15 @@ public final class BinFiles implements Closeable {
         Files.deleteIfExists(directory);
     }
 
-    private static void refill(FileChannel channel, ByteBuffer buffer, int minimumBytes) throws IOException {
-        buffer.compact();
-        while (buffer.position() < minimumBytes) {
-            if (channel.read(buffer) < 0) {
-                break;
-            }
-        }
-        buffer.flip();
-    }
+    private record OpenBins(IntWriter[] writers) implements Closeable {
 
-    private static void drain(FileChannel channel, ByteBuffer buffer) throws IOException {
-        buffer.flip();
-        while (buffer.hasRemaining()) {
-            channel.write(buffer);
+        IntWriter writer(int slot) {
+            return writers[slot];
         }
-        buffer.clear();
+
+        @Override
+        public void close() throws IOException {
+            closeAll(writers);
+        }
     }
 }

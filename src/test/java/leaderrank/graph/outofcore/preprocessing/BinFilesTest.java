@@ -1,4 +1,4 @@
-package leaderrank.graph.outofcore.build;
+package leaderrank.graph.outofcore.preprocessing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

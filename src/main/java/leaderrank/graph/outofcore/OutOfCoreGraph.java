@@ -1,22 +1,18 @@
 package leaderrank.graph.outofcore;
 
-import leaderrank.graph.outofcore.build.MemoryBudget;
-import leaderrank.graph.outofcore.build.Preprocessor;
-import leaderrank.graph.outofcore.build.PreprocessingData;
+import leaderrank.graph.outofcore.io.IntReader;
+import leaderrank.graph.outofcore.preprocessing.MemoryBudget;
+import leaderrank.graph.outofcore.preprocessing.Preprocessor;
+import leaderrank.graph.outofcore.preprocessing.PreprocessingData;
 import leaderrank.graph.Graph;
 import leaderrank.graph.EdgeSource;
 import leaderrank.graph.SourceCursor;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
-import java.util.NoSuchElementException;
 import java.util.PrimitiveIterator;
 
 public final class OutOfCoreGraph implements Graph {
@@ -24,7 +20,7 @@ public final class OutOfCoreGraph implements Graph {
 
     private final PreprocessingData data;
     private final ThreadLocal<ByteBuffer> gatherBuffer =
-            ThreadLocal.withInitial(() -> ByteBuffer.allocate(SOURCES_BUFFER_BYTES).order(ByteOrder.LITTLE_ENDIAN));
+            ThreadLocal.withInitial(() -> ByteBuffer.allocate(SOURCES_BUFFER_BYTES));
 
     private OutOfCoreGraph(PreprocessingData data) {
         this.data = data;
@@ -104,19 +100,9 @@ public final class OutOfCoreGraph implements Graph {
         int begin = data.sourcesPtr()[destinationDenseId];
         int count = data.sourcesPtr()[destinationDenseId + 1] - begin;
         int[] window = new int[count];
-        try (FileChannel channel = FileChannel.open(data.sourcesFile(), StandardOpenOption.READ)) {
-            ByteBuffer buffer = ByteBuffer.allocate(count * Integer.BYTES).order(ByteOrder.LITTLE_ENDIAN);
-            long position = (long) begin * Integer.BYTES;
-            while (buffer.hasRemaining()) {
-                int read = channel.read(buffer, position);
-                if (read < 0) {
-                    throw new IOException("unexpected end of " + data.sourcesFile());
-                }
-                position += read;
-            }
-            buffer.flip();
+        try (IntReader reader = IntReader.open(data.sourcesFile(), SOURCES_BUFFER_BYTES, (long) begin * Integer.BYTES)) {
             for (int i = 0; i < count; i++) {
-                window[i] = buffer.getInt();
+                window[i] = reader.next();
             }
         }
         return Arrays.stream(window).iterator();

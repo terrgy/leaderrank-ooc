@@ -1,4 +1,4 @@
-package leaderrank.graph.outofcore.build;
+package leaderrank.graph.outofcore.preprocessing;
 
 public record MemoryBudget(long totalBytes) {
 
