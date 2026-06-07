@@ -2,7 +2,7 @@ package leaderrank.cli;
 
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
-import leaderrank.gen.RmatGenerator;
+import leaderrank.generate.RmatGenerator;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;

@@ -1,6 +1,5 @@
 package leaderrank.graph;
 
-import leaderrank.graph.edge.EdgeSource;
 
 import java.io.IOException;
 

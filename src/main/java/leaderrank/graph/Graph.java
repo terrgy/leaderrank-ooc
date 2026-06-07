@@ -1,6 +1,5 @@
 package leaderrank.graph;
 
-import leaderrank.graph.source.SourceCursor;
 
 import java.io.IOException;
 import java.util.PrimitiveIterator;

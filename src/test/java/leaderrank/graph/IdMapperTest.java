@@ -2,7 +2,6 @@ package leaderrank.graph;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import leaderrank.utils.IdMapper;
 import org.junit.jupiter.api.Test;
 
 class IdMapperTest {

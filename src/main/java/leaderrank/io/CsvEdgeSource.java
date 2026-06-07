@@ -1,7 +1,7 @@
 package leaderrank.io;
 
-import leaderrank.graph.edge.EdgeCursor;
-import leaderrank.graph.edge.EdgeSource;
+import leaderrank.graph.EdgeCursor;
+import leaderrank.graph.EdgeSource;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 

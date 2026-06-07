@@ -1,12 +1,12 @@
 package leaderrank.cli;
 
 import java.io.IOException;
-import leaderrank.core.DenseLeaderRank;
-import leaderrank.core.LeaderRank;
-import leaderrank.core.ParallelLeaderRank;
-import leaderrank.core.RankingEngine;
+import leaderrank.metric.DenseLeaderRank;
+import leaderrank.metric.LeaderRank;
+import leaderrank.metric.ParallelLeaderRank;
+import leaderrank.metric.RankingEngine;
 import leaderrank.graph.Graph;
-import leaderrank.graph.edge.EdgeSource;
+import leaderrank.graph.EdgeSource;
 import leaderrank.graph.inmemory.InMemoryGraph;
 import leaderrank.graph.outofcore.OutOfCoreGraph;
 import picocli.CommandLine.Model.CommandSpec;

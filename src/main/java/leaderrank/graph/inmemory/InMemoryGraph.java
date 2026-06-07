@@ -1,10 +1,10 @@
 package leaderrank.graph.inmemory;
 
 import leaderrank.graph.Graph;
-import leaderrank.graph.source.SourceCursor;
-import leaderrank.utils.IdMapper;
-import leaderrank.graph.edge.EdgeCursor;
-import leaderrank.graph.edge.EdgeSource;
+import leaderrank.graph.SourceCursor;
+import leaderrank.graph.IdMapper;
+import leaderrank.graph.EdgeCursor;
+import leaderrank.graph.EdgeSource;
 
 import java.io.IOException;
 import java.util.ArrayList;

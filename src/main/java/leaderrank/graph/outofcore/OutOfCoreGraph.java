@@ -1,9 +1,11 @@
 package leaderrank.graph.outofcore;
 
+import leaderrank.graph.outofcore.build.MemoryBudget;
+import leaderrank.graph.outofcore.build.Preprocessor;
+import leaderrank.graph.outofcore.build.PreprocessingData;
 import leaderrank.graph.Graph;
-import leaderrank.graph.edge.EdgeSource;
-import leaderrank.graph.source.SourceCursor;
-import leaderrank.graph.source.SourceFileStream;
+import leaderrank.graph.EdgeSource;
+import leaderrank.graph.SourceCursor;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -20,11 +22,11 @@ import java.util.PrimitiveIterator;
 public final class OutOfCoreGraph implements Graph {
     static final int SOURCES_BUFFER_BYTES = 1 << 16;
 
-    private final OutOfCorePreprocessingData data;
+    private final PreprocessingData data;
     private final ThreadLocal<ByteBuffer> gatherBuffer =
             ThreadLocal.withInitial(() -> ByteBuffer.allocate(SOURCES_BUFFER_BYTES).order(ByteOrder.LITTLE_ENDIAN));
 
-    private OutOfCoreGraph(OutOfCorePreprocessingData data) {
+    private OutOfCoreGraph(PreprocessingData data) {
         this.data = data;
     }
 
@@ -42,7 +44,7 @@ public final class OutOfCoreGraph implements Graph {
 
     public static Graph build(EdgeSource source, MemoryBudget budget, int parallelism) throws IOException {
         return new OutOfCoreGraph(
-                OutOfCoreGraphPreprocessor.process(source, sourcesFile(), budget, parallelism));
+                Preprocessor.process(source, sourcesFile(), budget, parallelism));
     }
 
     public static Graph build(EdgeSource source, long maxEdgesPerBin) throws IOException {
@@ -51,7 +53,7 @@ public final class OutOfCoreGraph implements Graph {
 
     public static Graph build(EdgeSource source, long maxEdgesPerBin, int parallelism) throws IOException {
         return new OutOfCoreGraph(
-                OutOfCoreGraphPreprocessor.process(source, sourcesFile(), maxEdgesPerBin, parallelism));
+                Preprocessor.process(source, sourcesFile(), maxEdgesPerBin, parallelism));
     }
 
     private static Path sourcesFile() throws IOException {

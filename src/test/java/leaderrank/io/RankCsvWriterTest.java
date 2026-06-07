@@ -8,7 +8,7 @@ import java.io.StringWriter;
 import java.util.PrimitiveIterator;
 import java.util.stream.IntStream;
 import leaderrank.graph.Graph;
-import leaderrank.graph.source.SourceCursor;
+import leaderrank.graph.SourceCursor;
 import org.junit.jupiter.api.Test;
 
 class RankCsvWriterTest {

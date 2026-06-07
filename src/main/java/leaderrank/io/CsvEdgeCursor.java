@@ -1,6 +1,6 @@
 package leaderrank.io;
 
-import leaderrank.graph.edge.EdgeCursor;
+import leaderrank.graph.EdgeCursor;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 

@@ -1,5 +1,7 @@
 package leaderrank.graph.outofcore;
 
+import leaderrank.graph.outofcore.build.MemoryBudget;
+import leaderrank.graph.outofcore.build.Preprocessor;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
@@ -10,9 +12,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.PrimitiveIterator;
 import java.util.Random;
-import leaderrank.core.LeaderRank;
+import leaderrank.metric.LeaderRank;
 import leaderrank.graph.Graph;
-import leaderrank.graph.edge.EdgeSource;
+import leaderrank.graph.EdgeSource;
 import leaderrank.graph.inmemory.InMemoryGraph;
 import leaderrank.io.CsvEdgeSource;
 import org.junit.jupiter.api.Test;
@@ -49,8 +51,8 @@ class OutOfCoreSourcesTest {
             EdgeSource source = csv(randomCsv(seed));
             Path whole = dir.resolve("whole-" + seed);
             Path tiny = dir.resolve("tiny-" + seed);
-            OutOfCoreGraphPreprocessor.process(source, whole, 1L << 30);
-            OutOfCoreGraphPreprocessor.process(source, tiny, 1);
+            Preprocessor.process(source, whole, 1L << 30);
+            Preprocessor.process(source, tiny, 1);
             assertThat(Files.readAllBytes(tiny)).isEqualTo(Files.readAllBytes(whole));
         }
     }
@@ -65,8 +67,8 @@ class OutOfCoreSourcesTest {
 
         Path external = dir.resolve("external");
         Path inRam = dir.resolve("inram");
-        OutOfCoreGraphPreprocessor.process(source, external, 8);
-        OutOfCoreGraphPreprocessor.process(source, inRam, 1L << 30);
+        Preprocessor.process(source, external, 8);
+        Preprocessor.process(source, inRam, 1L << 30);
 
         assertThat(Files.readAllBytes(external)).isEqualTo(Files.readAllBytes(inRam));
     }
@@ -77,8 +79,8 @@ class OutOfCoreSourcesTest {
             EdgeSource source = csv(randomCsv(seed));
             Path bounded = dir.resolve("bounded-" + seed);
             Path whole = dir.resolve("whole-" + seed);
-            OutOfCoreGraphPreprocessor.process(source, bounded, new MemoryBudget(1 << 20));
-            OutOfCoreGraphPreprocessor.process(source, whole, 1L << 30);
+            Preprocessor.process(source, bounded, new MemoryBudget(1 << 20));
+            Preprocessor.process(source, whole, 1L << 30);
             assertThat(Files.readAllBytes(bounded)).isEqualTo(Files.readAllBytes(whole));
         }
     }
@@ -92,8 +94,8 @@ class OutOfCoreSourcesTest {
         EdgeSource source = csv(text.toString());
         Path bounded = dir.resolve("bounded");
         Path whole = dir.resolve("whole");
-        OutOfCoreGraphPreprocessor.process(source, bounded, new MemoryBudget(1 << 20));
-        OutOfCoreGraphPreprocessor.process(source, whole, 1L << 30);
+        Preprocessor.process(source, bounded, new MemoryBudget(1 << 20));
+        Preprocessor.process(source, whole, 1L << 30);
         assertThat(Files.readAllBytes(bounded)).isEqualTo(Files.readAllBytes(whole));
     }
 
