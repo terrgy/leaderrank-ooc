@@ -1,0 +1,70 @@
+% =====================================================================
+%  Вычисление аналитической метрики на большом графе (out-of-core LeaderRank)
+%  Итоговый отчёт по вступительному заданию.
+%  Engine: pdfLaTeX (TeX Live). Кириллица: T2A + inputenc(utf8) + babel.
+%  Сборка: ./build.sh   (pdflatex прогоняется дважды ради оглавления и ссылок)
+% =====================================================================
+\documentclass[12pt,a4paper]{article}
+
+% --- Кодировка и язык (pdfLaTeX + кириллица) ---
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english,russian]{babel} % основной язык — русский (последний в списке)
+
+% --- Математика ---
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+% --- Вёрстка и оформление ---
+\usepackage[a4paper,margin=2.5cm]{geometry}
+% expansion=false: font expansion требует особой настройки шрифтов; оставляем
+% только protrusion (визуальное выравнивание полей).
+\usepackage[protrusion=true,expansion=false]{microtype}
+\usepackage{enumitem}
+\usepackage{booktabs}
+
+% Немного свободы переносу строк, чтобы плотные формулы и моноширинные имена
+% не вылезали на поля.
+\setlength{\emergencystretch}{3em}
+
+% --- Ссылки (загружается одним из последних) ---
+\usepackage[hidelinks]{hyperref}
+
+% --- Удобные сокращения для обозначений ---
+\newcommand{\In}{\operatorname{In}}        % множество входящих соседей
+\newcommand{\Out}{\operatorname{Out}}       % множество исходящих соседей
+\newcommand{\degout}{\deg^{\mathrm{out}}}   % исходящая степень
+\newcommand{\degin}{\deg^{\mathrm{in}}}     % входящая степень
+\newcommand{\one}{\mathbf{1}}               % вектор из единиц
+\newcommand{\T}{^{\top}}                     % транспонирование
+\newcommand{\bigO}{\mathcal{O}}             % O-большое
+
+\title{Вычисление аналитической метрики на большом графе\\[2pt]
+       \large Out-of-core LeaderRank с параллельной обработкой}
+\author{} % укажите ФИО автора
+\date{\today}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+\noindent
+В работе вычисляется метрика центральности \textbf{LeaderRank} на ориентированном невзвешенном
+графе, который не помещается в оперативную память. Рёбра хранятся на диске и читаются потоком, а в
+памяти остаются только массивы размером с число вершин. Счёт идёт во много потоков и не зависит от
+их числа: результат получается один и тот же бит в бит. В отчёте разобраны выбор метрики, варианты
+хранения графа, устройство решения, анализ сложности и точности, а также замеры на синтетических и
+реальных графах.
+\end{abstract}
+\medskip
+
+\input{sections/00-intro}
+\input{sections/01-metric}
+\input{sections/02-approaches}
+\input{sections/03-architecture}
+\input{sections/04-parallelism}
+\input{sections/05-memory}
+\input{sections/06-complexity}
+\input{sections/07-testing}
+\input{sections/08-conclusion}
+
+\end{document}
