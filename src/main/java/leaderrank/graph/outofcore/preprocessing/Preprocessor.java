@@ -12,6 +12,8 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 
+// Builds the on-disk CSC in bounded RAM. Pass 1 maps ids and counts degrees while spilling dense
+// edges, then edges are bucketed by destination and each bucket is sorted into the in-neighbour column.
 public final class Preprocessor {
 
     private static final int EDGE_BUFFER_BYTES = 1 << 16;
@@ -23,6 +25,8 @@ public final class Preprocessor {
         }
     }
 
+    // Pass 1. Assign dense ids in first-appearance order, tally in and out degrees, and write the
+    // dense (from, to) edges for the bucketing pass.
     static Pass1Result buildIdMapAndSpill(EdgeCursor cursor, Path denseEdges) throws IOException {
         IdMapper mapper = new IdMapper();
         IntArrayList inDegrees = new IntArrayList();
@@ -51,6 +55,8 @@ public final class Preprocessor {
         return buildIdMapAndSpill(source, denseEdges);
     }
 
+    // Parse the file in parallel byte ranges, then replay the raw chunks in file order. Sequential
+    // replay reproduces the exact single-pass id labelling, so the result is the same for any P.
     private static Pass1Result mapAndSpillParallel(Path csvFile, Path denseEdges, int parallelism) throws IOException {
         Path workDirectory = Files.createTempDirectory("leaderrank-raw-");
         workDirectory.toFile().deleteOnExit();
@@ -112,6 +118,8 @@ public final class Preprocessor {
         return denseEdges;
     }
 
+    // Plan destination bins under the edge limit, route the dense edges into per-bin files, then sort
+    // each bin and append its source column. The dense edge file is dropped as soon as it is consumed.
     private static PreprocessingData assemble(Path denseEdges, Pass1Result pass1, Path sourcesPath,
             int maxEdgesPerBin, long availableBytes) throws IOException {
         List<Bin> bins = BinPlanner.plan(pass1.sourcesPtr(), maxEdgesPerBin);
@@ -140,6 +148,8 @@ public final class Preprocessor {
         return (int) Math.clamp(value, 1, Integer.MAX_VALUE);
     }
 
+    // Normal bins fit in RAM and sort with one Arrays.sort. An oversized bin (a hyper-node) goes through
+    // external merge sort so its RAM stays bounded whatever the in-degree.
     private static void writeSortedSources(BinFiles binFiles, Path sourcesPath, int chunkRecords, long availableBytes)
             throws IOException {
         List<Bin> bins = binFiles.bins();

@@ -15,10 +15,14 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.PrimitiveIterator;
 
+// CSC-on-disk graph. The in-neighbour column lives in one destination-ordered file and is streamed,
+// while only the O(N) pointer and degree arrays stay resident. That split is what fits the memory cap.
 public final class OutOfCoreGraph implements Graph {
     static final int SOURCES_BUFFER_BYTES = 1 << 16;
 
     private final PreprocessingData data;
+    // One reusable read buffer per worker thread. A pool thread runs one shard at a time, so the
+    // gather borrows this instead of allocating per shard.
     private final ThreadLocal<ByteBuffer> gatherBuffer =
             ThreadLocal.withInitial(() -> ByteBuffer.allocate(SOURCES_BUFFER_BYTES));
 

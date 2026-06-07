@@ -10,6 +10,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.PrimitiveIterator;
 
+// Naive in-memory representation kept as the negative control. The boxed nested lists are deliberate:
+// it holds all O(E) edges in RAM, so it runs out of memory under the cap where the streaming graph copes.
 public final class InMemoryGraph implements Graph {
     private int edgeCount;
     private int vertexCount;

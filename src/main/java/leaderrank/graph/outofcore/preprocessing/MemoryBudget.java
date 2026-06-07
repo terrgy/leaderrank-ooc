@@ -1,5 +1,7 @@
 package leaderrank.graph.outofcore.preprocessing;
 
+// Turns the discovered heap ceiling into the two knobs preprocessing needs: the free pool each
+// sequential phase may use, and the edges per bin so an in-RAM bin sort fits the old generation.
 public record MemoryBudget(long totalBytes) {
 
     private static final long RESERVE_BYTES = 32L << 20;
@@ -18,11 +20,15 @@ public record MemoryBudget(long totalBytes) {
         return new MemoryBudget(Runtime.getRuntime().maxMemory());
     }
 
+    // Free pool after the native reserve and the resident O(N) vectors. Distribute, sort and merge run
+    // one at a time, so each may use the whole pool.
     public long availableBytes(int vertexCount) {
         long available = totalBytes - RESERVE_BYTES - RESIDENT_BYTES_PER_VERTEX * vertexCount;
         return available < 0 ? 0 : available;
     }
 
+    // Bound a bin by the old generation so the long[] of packed edges that the in-RAM sort builds
+    // cannot overflow it. The serial collector keeps old gen near three fifths of the heap.
     public int maxEdgesPerBin(int vertexCount) {
         long oldGenBytes = totalBytes * OLD_GEN_NUMERATOR / OLD_GEN_DENOMINATOR;
         long sortPool = oldGenBytes - RESIDENT_BYTES_PER_VERTEX * vertexCount;

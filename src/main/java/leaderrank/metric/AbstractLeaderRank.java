@@ -6,6 +6,9 @@ import leaderrank.graph.SourceCursor;
 import java.io.IOException;
 import java.util.Arrays;
 
+// LeaderRank as a power method on the graph plus a ground node tied both ways to every vertex.
+// One iteration spreads each score over its out-neighbours and the ground, then gathers per
+// destination. Subclasses choose only how that gather runs.
 abstract class AbstractLeaderRank implements RankingEngine {
 
     public static final double DEFAULT_TOLERANCE = 1e-8;
@@ -50,12 +53,16 @@ abstract class AbstractLeaderRank implements RankingEngine {
 
                 gather.gather(graph, contrib, base, next);
 
+                // Seeding the sum with the ground delta keeps the exact serial order. Float addition
+                // is not associative, so this is what keeps parallel and serial runs bit for bit equal.
                 double delta = l1Distance(Math.abs(nextGround - ground), scores, next);
                 double[] swap = scores;
                 scores = next;
                 next = swap;
                 ground = nextGround;
 
+                // Threshold scales with n because total mass stays at n. A fixed tolerance would
+                // never fire on large graphs.
                 if (delta < tolerance * n) {
                     converged = true;
                     break;
@@ -69,6 +76,8 @@ abstract class AbstractLeaderRank implements RankingEngine {
 
     abstract Gather openGather(Graph graph, int n) throws IOException;
 
+    // Pull gather over destinations [begin, end). Each output cell has a single writer, so the result
+    // does not depend on how the range is split across threads.
     static void gatherRange(Graph graph, int begin, int end, double[] contrib, double base, double[] next)
             throws IOException {
         try (SourceCursor cursor = graph.openSourceCursor(begin)) {
@@ -111,6 +120,8 @@ abstract class AbstractLeaderRank implements RankingEngine {
         }
     }
 
+    // Fills next[] from contrib[] for one iteration. Opened once per run so a parallel gather can keep
+    // a thread pool alive across iterations and free it on close.
     interface Gather extends AutoCloseable {
         void gather(Graph graph, double[] contrib, double base, double[] next) throws IOException;
 

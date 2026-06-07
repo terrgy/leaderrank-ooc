@@ -3,6 +3,8 @@ package leaderrank.graph;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 
+// Maps sparse int32 vertex ids to a dense 0..n-1 range in first-appearance order. Every array in the
+// engine is indexed by that dense id.
 public final class IdMapper {
 
     private static final int ABSENT = -1;

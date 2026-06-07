@@ -1,11 +1,9 @@
 package leaderrank.cli;
 
 import java.util.Iterator;
-import java.util.List;
 import picocli.CommandLine.ITypeConverter;
-import picocli.CommandLine.TypeConversionException;
 
-enum EngineChoice {
+enum EngineChoice implements Choices.Labelled {
     DENSE("dense"),
     COMMON("common"),
     PARALLEL("parallel");
@@ -17,17 +15,17 @@ enum EngineChoice {
     }
 
     @Override
+    public String label() {
+        return label;
+    }
+
+    @Override
     public String toString() {
         return label;
     }
 
     static EngineChoice fromLabel(String value) {
-        for (EngineChoice choice : values()) {
-            if (choice.label.equalsIgnoreCase(value)) {
-                return choice;
-            }
-        }
-        throw new TypeConversionException("expected one of dense, common, parallel but was '" + value + "'");
+        return Choices.parse(values(), value);
     }
 
     static final class Converter implements ITypeConverter<EngineChoice> {
@@ -40,7 +38,7 @@ enum EngineChoice {
     static final class Candidates implements Iterable<String> {
         @Override
         public Iterator<String> iterator() {
-            return List.of("dense", "common", "parallel").iterator();
+            return Choices.labels(values()).iterator();
         }
     }
 }

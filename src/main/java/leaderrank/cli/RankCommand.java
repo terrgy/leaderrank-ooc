@@ -1,10 +1,8 @@
 package leaderrank.cli;
 
 import java.nio.file.Path;
-import java.util.Comparator;
 import java.util.Locale;
 import java.util.concurrent.Callable;
-import java.util.stream.IntStream;
 import leaderrank.metric.LeaderRankResult;
 import leaderrank.metric.RankingEngine;
 import leaderrank.graph.Graph;
@@ -84,6 +82,7 @@ final class RankCommand implements Callable<Integer> {
         System.out.printf(Locale.ROOT, "compute: %.1f ms%n", computeMillis);
         printStats(graph, result);
 
+        // Console rule: a file output suppresses the full listing unless --print-top asks for some.
         if (output != null) {
             new RankCsvWriter().write(output, graph, result.scores());
             System.out.println("wrote ranks to " + output);
@@ -115,12 +114,7 @@ final class RankCommand implements Callable<Integer> {
     }
 
     private static void printRanks(Graph graph, double[] scores, int limit) {
-        int[] order = IntStream.range(0, scores.length)
-                .boxed()
-                .sorted(Comparator.comparingDouble((Integer v) -> scores[v]).reversed()
-                        .thenComparingInt(graph::originalId))
-                .mapToInt(Integer::intValue)
-                .toArray();
+        int[] order = RankCsvWriter.orderByRank(graph, scores);
         int count = limit < 0 ? order.length : Math.min(limit, order.length);
         System.out.println(limit < 0 ? "ranks:" : "top " + count + " leaders:");
         for (int i = 0; i < count; i++) {

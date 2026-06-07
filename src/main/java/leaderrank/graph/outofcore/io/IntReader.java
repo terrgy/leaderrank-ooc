@@ -7,6 +7,8 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
+// A file read as a stream of little-endian ints. next() refills in bulk and throws at an unexpected
+// end, so a caller that knows the count can skip hasNext. The buffer can be borrowed for per-thread reuse.
 public final class IntReader implements AutoCloseable {
 
     private final FileChannel channel;

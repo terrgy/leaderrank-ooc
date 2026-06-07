@@ -7,6 +7,8 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
+// A file written as a stream of little-endian ints. close() flushes, forces the dirty pages out, then
+// closes, which lets the kernel reclaim the temp files and keeps the run inside the cgroup cap.
 public final class IntWriter implements AutoCloseable {
 
     private final FileChannel channel;

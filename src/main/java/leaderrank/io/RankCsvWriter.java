@@ -35,7 +35,8 @@ public final class RankCsvWriter {
         }
     }
 
-    private static int[] orderByRank(Graph graph, double[] scores) {
+    // The leaderboard order shared by the file and the console: highest score first, original id breaks ties.
+    public static int[] orderByRank(Graph graph, double[] scores) {
         int n = graph.vertexCount();
         Integer[] order = new Integer[n];
         for (int i = 0; i < n; i++) {

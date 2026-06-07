@@ -4,6 +4,8 @@ import leaderrank.graph.Graph;
 
 import java.io.IOException;
 
+// Reference oracle. Builds the full (n+1)x(n+1) transition matrix with the ground node at index n and
+// runs plain power iteration. Kept independent of the streaming engines so the cross-check stays honest.
 public final class DenseLeaderRank implements RankingEngine {
 
     public static final double DEFAULT_TOLERANCE = 1e-8;
@@ -70,6 +72,7 @@ public final class DenseLeaderRank implements RankingEngine {
         return new LeaderRankResult(ranks, iterations, converged);
     }
 
+    // Entry [i][j] is the share of score that flows from j to i, so every column sums to one.
     private static double[][] buildTransition(Graph graph, int size, int ground) throws IOException {
         int n = ground;
         double[][] transition = new double[size][size];

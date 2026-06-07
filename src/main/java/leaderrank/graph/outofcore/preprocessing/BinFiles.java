@@ -11,6 +11,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 
+// The per-destination bin files between the bucketing and sorting passes. Normal bins store (dest, src)
+// pairs, oversized bins store bare src since their one destination is implied.
 public final class BinFiles implements Closeable {
 
     private static final int PAIR_BYTES = 2 * Integer.BYTES;
@@ -83,6 +85,8 @@ public final class BinFiles implements Closeable {
         distribute(denseEdges, Long.MAX_VALUE);
     }
 
+    // Route edges into bins. When the budget cannot hold a write buffer for every bin at once, open a
+    // window of bins and re-stream the source once per window.
     void distribute(Path denseEdges, long availableBytes) throws IOException {
         int count = bins.size();
         int maxOpenBins = maxOpenBins(availableBytes, count);

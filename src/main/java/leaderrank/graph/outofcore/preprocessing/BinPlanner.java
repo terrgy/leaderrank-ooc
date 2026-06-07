@@ -3,6 +3,8 @@ package leaderrank.graph.outofcore.preprocessing;
 import java.util.ArrayList;
 import java.util.List;
 
+// Plans contiguous destination ranges, each holding at most maxEdgesPerBin in-edges. A destination
+// whose in-degree alone exceeds the limit gets its own oversized bin, since one key cannot be split.
 public final class BinPlanner {
 
     private BinPlanner() {

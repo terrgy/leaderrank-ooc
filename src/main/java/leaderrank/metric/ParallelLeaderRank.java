@@ -11,6 +11,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+// Parallel gather. Destinations split into edge-balanced shards and each shard owns a private slice
+// of next[], so no two threads touch the same cell and the output matches the serial run for any P.
 public final class ParallelLeaderRank extends AbstractLeaderRank {
 
     public static final int DEFAULT_SHARDS_PER_THREAD = 4;
@@ -34,6 +36,8 @@ public final class ParallelLeaderRank extends AbstractLeaderRank {
         return new ParallelGather(Executors.newFixedThreadPool(threads), planShards(graph, n));
     }
 
+    // More shards than threads so the pool can steal work and one heavy hyper-node shard does not
+    // stall the rest.
     private List<Shard> planShards(Graph graph, int n) {
         int[] sourcesPtr = new int[n + 1];
         for (int d = 0; d < n; d++) {

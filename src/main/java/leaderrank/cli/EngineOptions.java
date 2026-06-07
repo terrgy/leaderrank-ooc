@@ -38,6 +38,8 @@ final class EngineOptions {
             description = "power-method iteration cap (default: ${DEFAULT-VALUE})")
     private int maxIterations = ParallelLeaderRank.DEFAULT_MAX_ITERATIONS;
 
+    // --threads only means something when work is actually parallel, so reject it otherwise instead of
+    // silently ignoring it.
     void validate(CommandSpec spec) {
         boolean explicitThreads = spec.commandLine().getParseResult().hasMatchedOption("--threads");
         if (explicitThreads && engine != EngineChoice.PARALLEL && graph != GraphChoice.OUT_OF_CORE) {
@@ -73,13 +75,17 @@ final class EngineOptions {
 
     RankingEngine engine() {
         return switch (engine) {
-            case DENSE -> new DenseLeaderRank(DenseLeaderRank.DEFAULT_TOLERANCE, maxIterations);
+            case DENSE -> denseEngine();
             case COMMON -> new LeaderRank(LeaderRank.DEFAULT_TOLERANCE, maxIterations);
             case PARALLEL -> new ParallelLeaderRank(threads, ParallelLeaderRank.DEFAULT_TOLERANCE, maxIterations);
         };
     }
 
     RankingEngine truthEngine() {
+        return denseEngine();
+    }
+
+    private RankingEngine denseEngine() {
         return new DenseLeaderRank(DenseLeaderRank.DEFAULT_TOLERANCE, maxIterations);
     }
 }

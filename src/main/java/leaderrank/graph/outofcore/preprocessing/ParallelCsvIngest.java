@@ -18,6 +18,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+// Parallel CSV parse. Split the file into newline-aligned byte ranges, parse each into a raw chunk,
+// then reassemble the chunks in file order. Output is independent of the thread count.
 final class ParallelCsvIngest {
 
     private static final int READ_BUFFER_BYTES = 1 << 16;
@@ -86,6 +88,7 @@ final class ParallelCsvIngest {
         return boundaries;
     }
 
+    // First offset past the next newline at or after `from`. Keeps every chunk boundary on a row edge.
     private static long afterNextNewline(FileChannel channel, long from, long size) throws IOException {
         if (from >= size) {
             return size;
@@ -137,6 +140,8 @@ final class ParallelCsvIngest {
         return new IOException("parallel CSV parse failed", cause);
     }
 
+    // Parser for the from,to columns. Carries the current column across reads so a row may straddle
+    // two buffers.
     private static final class RowParser {
 
         private int column;

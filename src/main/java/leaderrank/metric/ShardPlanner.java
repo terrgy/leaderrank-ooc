@@ -3,6 +3,8 @@ package leaderrank.metric;
 import java.util.ArrayList;
 import java.util.List;
 
+// Splits [0, n) into contiguous destination ranges of roughly equal edge count. Dense regions get
+// few destinations and sparse tails get many. A hyper-node makes its range heavy but is never split.
 public final class ShardPlanner {
 
     private ShardPlanner() {

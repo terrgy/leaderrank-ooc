@@ -14,6 +14,8 @@ import leaderrank.graph.EdgeSource;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 
+// Deterministic R-MAT generator. Each edge is placed by recursively picking a quadrant of the
+// adjacency matrix, which concentrates mass into a few vertices and produces power-law hyper-nodes.
 public final class RmatGenerator implements EdgeSource {
 
     public static final double DEFAULT_A = 0.57;
@@ -66,38 +68,7 @@ public final class RmatGenerator implements EdgeSource {
 
     @Override
     public EdgeCursor open() {
-        return new EdgeCursor() {
-            private final Random random = new Random(seed);
-            private long produced = 0;
-            private int from;
-            private int to;
-
-            @Override
-            public boolean next() {
-                if (produced >= edges) {
-                    return false;
-                }
-                long edge = nextEdge(random);
-                from = (int) (edge >>> 32);
-                to = (int) edge;
-                produced++;
-                return true;
-            }
-
-            @Override
-            public int from() {
-                return from;
-            }
-
-            @Override
-            public int to() {
-                return to;
-            }
-
-            @Override
-            public void close() {
-            }
-        };
+        return new RmatCursor();
     }
 
     public Graph toGraph(GraphFactory factory) throws IOException {
@@ -124,6 +95,8 @@ public final class RmatGenerator implements EdgeSource {
         }
     }
 
+    // Walk the scale bits from high to low, choosing a quadrant per bit from the a/b/c/d split. The
+    // chosen (from, to) is packed into one long.
     private long nextEdge(Random random) {
         int from = 0;
         int to = 0;
@@ -145,5 +118,38 @@ public final class RmatGenerator implements EdgeSource {
             }
         }
         return ((long) from << 32) | (to & 0xffffffffL);
+    }
+
+    private final class RmatCursor implements EdgeCursor {
+        private final Random random = new Random(seed);
+        private long produced = 0;
+        private int from;
+        private int to;
+
+        @Override
+        public boolean next() {
+            if (produced >= edges) {
+                return false;
+            }
+            long edge = nextEdge(random);
+            from = (int) (edge >>> 32);
+            to = (int) edge;
+            produced++;
+            return true;
+        }
+
+        @Override
+        public int from() {
+            return from;
+        }
+
+        @Override
+        public int to() {
+            return to;
+        }
+
+        @Override
+        public void close() {
+        }
     }
 }

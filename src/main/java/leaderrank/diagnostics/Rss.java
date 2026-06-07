@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+// Reads peak resident memory (VmHWM) from /proc/self/status. Returns -1 where that is not available,
+// for example off Linux.
 public final class Rss {
 
     private static final Path STATUS = Path.of("/proc/self/status");

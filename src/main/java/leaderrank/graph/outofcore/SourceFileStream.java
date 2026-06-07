@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
 
+// SourceCursor backed by the on-disk in-neighbour file. The buffer-sharing constructor lets the engine
+// pass one reusable buffer per thread instead of allocating per cursor.
 public final class SourceFileStream implements SourceCursor {
 
     private final IntReader reader;

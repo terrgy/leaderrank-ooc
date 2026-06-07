@@ -1,11 +1,9 @@
 package leaderrank.cli;
 
 import java.util.Iterator;
-import java.util.List;
 import picocli.CommandLine.ITypeConverter;
-import picocli.CommandLine.TypeConversionException;
 
-enum GraphChoice {
+enum GraphChoice implements Choices.Labelled {
     IN_MEMORY("in-memory"),
     OUT_OF_CORE("out-of-core");
 
@@ -16,17 +14,17 @@ enum GraphChoice {
     }
 
     @Override
+    public String label() {
+        return label;
+    }
+
+    @Override
     public String toString() {
         return label;
     }
 
     static GraphChoice fromLabel(String value) {
-        for (GraphChoice choice : values()) {
-            if (choice.label.equalsIgnoreCase(value)) {
-                return choice;
-            }
-        }
-        throw new TypeConversionException("expected one of in-memory, out-of-core but was '" + value + "'");
+        return Choices.parse(values(), value);
     }
 
     static final class Converter implements ITypeConverter<GraphChoice> {
@@ -39,7 +37,7 @@ enum GraphChoice {
     static final class Candidates implements Iterable<String> {
         @Override
         public Iterator<String> iterator() {
-            return List.of("in-memory", "out-of-core").iterator();
+            return Choices.labels(values()).iterator();
         }
     }
 }

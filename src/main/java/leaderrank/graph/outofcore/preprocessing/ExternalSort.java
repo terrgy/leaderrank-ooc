@@ -11,6 +11,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.PriorityQueue;
 
+// External merge sort for one oversized bin. Generate sorted runs of at most M ints, then k-way merge.
+// Fan-in is capped so a huge key degrades to extra merge passes instead of running out of memory.
 final class ExternalSort {
 
     private static final int IO_BUFFER_BYTES = 1 << 16;
